@@ -21,7 +21,7 @@ nonisolated enum MonekarAPI {
         let thumbnailURL: String
     }
 
-    nonisolated struct Image: Codable, Equatable, Sendable, Identifiable {
+    nonisolated struct Image: Codable, Hashable, Sendable, Identifiable {
         let id: Int
         let albumID: Int
         let fileName: String
@@ -35,7 +35,7 @@ nonisolated enum MonekarAPI {
         let tags: [Tag]
     }
 
-    nonisolated struct Tag: Codable, Equatable, Sendable, Identifiable {
+    nonisolated struct Tag: Codable, Hashable, Sendable, Identifiable {
         let id: Int
         let name: String
     }
