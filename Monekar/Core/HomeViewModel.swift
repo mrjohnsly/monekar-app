@@ -34,11 +34,11 @@ final class HomeViewModel {
                 state = .empty
                 return
             }
-            let token = try await services.credentials.accessToken()
+            let password = try await services.credentials.password()
             try Task.checkCancellation()
             state = .loaded(ConnectionSummary(
                 serverURL: serverURL,
-                hasCredential: token?.isEmpty == false
+                hasCredential: password?.isEmpty == false
             ))
         } catch is CancellationError {
             state = previousState
