@@ -45,6 +45,10 @@ enum ConnectionConfigurationError: Error, Equatable {
     case missingUsername
 }
 
+struct CredentialError: Error {
+    let status: Int
+}
+
 enum ConnectionFailure: Error, Equatable {
     case invalidURL
     case missingUsername
@@ -56,6 +60,7 @@ enum ConnectionFailure: Error, Equatable {
     case serverRejected(Int)
     case invalidResponse
     case storageFailure
+    case credentialStorage(Int)
 
     var message: String {
         switch self {
@@ -78,7 +83,9 @@ enum ConnectionFailure: Error, Equatable {
         case .invalidResponse:
             "The server returned an invalid response. Check that this is a monekar-server URL."
         case .storageFailure:
-            "Monekar could not save this connection securely. Check Keychain access and try again."
+            "Monekar could not save the password in Keychain. Try again."
+        case .credentialStorage(let status):
+            "Monekar could not save the password in Keychain (error \(status))."
         }
     }
 }

@@ -54,6 +54,8 @@ final class ConnectionViewModel {
             state = .failed(error == .missingUsername ? .missingUsername : .invalidURL)
         } catch let failure as ConnectionFailure {
             state = .failed(failure)
+        } catch let error as CredentialError {
+            state = .failed(.credentialStorage(error.status))
         } catch {
             state = .failed(.storageFailure)
         }
@@ -71,7 +73,11 @@ final class ConnectionViewModel {
             password = ""
             state = .removed
         } catch {
-            state = .failed(.storageFailure)
+            if let error = error as? CredentialError {
+                state = .failed(.credentialStorage(error.status))
+            } else {
+                state = .failed(.storageFailure)
+            }
         }
     }
 }

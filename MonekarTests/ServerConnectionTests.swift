@@ -175,6 +175,13 @@ struct ServerConnectionTests {
         #expect(credentials.storedPassword == nil)
     }
 
+    @Test func keychainFailurePreservesTheOperatingSystemStatus() {
+        #expect(
+            ConnectionFailure.credentialStorage(-34018).message
+                == "Monekar could not save the password in Keychain (error -34018)."
+        )
+    }
+
     @Test func metadataPersistsOnlyConnectionConfiguration() throws {
         let suiteName = "ServerConnectionTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

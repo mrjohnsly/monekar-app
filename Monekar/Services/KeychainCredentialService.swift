@@ -1,10 +1,6 @@
 import Foundation
 import Security
 
-struct CredentialError: Error {
-    let status: OSStatus
-}
-
 @MainActor
 final class KeychainCredentialService: CredentialService {
     private let service: String
@@ -15,12 +11,15 @@ final class KeychainCredentialService: CredentialService {
     }
 
     private var query: [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecUseDataProtectionKeychain as String: true,
         ]
+        #if os(iOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        return query
     }
 
     func password() async throws -> String? {
@@ -30,10 +29,10 @@ final class KeychainCredentialService: CredentialService {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw CredentialError(status: status) }
+        guard status == errSecSuccess else { throw CredentialError(status: Int(status)) }
         guard let data = result as? Data,
               let password = String(data: data, encoding: .utf8) else {
-            throw CredentialError(status: errSecDecode)
+            throw CredentialError(status: Int(errSecDecode))
         }
         return password
     }
@@ -42,7 +41,7 @@ final class KeychainCredentialService: CredentialService {
         guard let password else {
             let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else {
-                throw CredentialError(status: status)
+                throw CredentialError(status: Int(status))
             }
             return
         }
@@ -51,11 +50,13 @@ final class KeychainCredentialService: CredentialService {
         if status == errSecItemNotFound {
             var item = query
             item.merge(attributes) { _, new in new }
+            #if os(iOS)
             item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            #endif
             let addStatus = SecItemAdd(item as CFDictionary, nil)
-            guard addStatus == errSecSuccess else { throw CredentialError(status: addStatus) }
+            guard addStatus == errSecSuccess else { throw CredentialError(status: Int(addStatus)) }
         } else if status != errSecSuccess {
-            throw CredentialError(status: status)
+            throw CredentialError(status: Int(status))
         }
     }
 }
