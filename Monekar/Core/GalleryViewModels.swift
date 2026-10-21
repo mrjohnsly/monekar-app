@@ -12,6 +12,7 @@ final class PaginatedViewModel<Item: Decodable & Identifiable & Equatable & Send
     private(set) var hasError = false
     private var nextOffset = 0
     private var failedRefresh = true
+    private var loadWaiters: [CheckedContinuation<Void, Never>] = []
     private let limit: Int
     private let fetch: (Int, Int) async throws -> MonekarAPI.Page<Item>
 
@@ -21,7 +22,10 @@ final class PaginatedViewModel<Item: Decodable & Identifiable & Equatable & Send
     }
 
     func loadIfNeeded() async {
-        guard state == .idle else { return }
+        while isLoading {
+            await withCheckedContinuation { loadWaiters.append($0) }
+        }
+        guard !Task.isCancelled, state == .idle else { return }
         await refresh()
     }
 
@@ -46,7 +50,12 @@ final class PaginatedViewModel<Item: Decodable & Identifiable & Equatable & Send
         isLoading = true
         hasError = false
         if items.isEmpty { state = .loading }
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            let waiters = loadWaiters
+            loadWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
+        }
 
         let offset = replacing ? 0 : nextOffset
         do {
@@ -93,6 +102,7 @@ final class DetailViewModel<Item: Equatable & Sendable> {
     private(set) var state: LoadState<Item> = .idle
     private(set) var isLoading = false
     private(set) var hasError = false
+    private var loadWaiters: [CheckedContinuation<Void, Never>] = []
     private let fetch: () async throws -> Item
 
     init(fetch: @escaping () async throws -> Item) {
@@ -100,7 +110,10 @@ final class DetailViewModel<Item: Equatable & Sendable> {
     }
 
     func loadIfNeeded() async {
-        guard state == .idle else { return }
+        while isLoading {
+            await withCheckedContinuation { loadWaiters.append($0) }
+        }
+        guard !Task.isCancelled, state == .idle else { return }
         await refresh()
     }
 
@@ -111,7 +124,12 @@ final class DetailViewModel<Item: Equatable & Sendable> {
         isLoading = true
         hasError = false
         if case .loaded = state {} else { state = .loading }
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            let waiters = loadWaiters
+            loadWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
+        }
         do {
             try Task.checkCancellation()
             let item = try await fetch()

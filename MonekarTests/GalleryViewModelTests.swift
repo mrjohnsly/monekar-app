@@ -158,13 +158,16 @@ struct GalleryViewModelTests {
         while continuation == nil { await Task.yield() }
         #expect(model.state == .loading)
         #expect(model.isLoading)
-        await model.loadIfNeeded()
+        let duplicate = Task { await model.loadIfNeeded() }
+        await Task.yield()
         await model.refresh()
         await model.loadMore()
         #expect(requests == 1)
+        duplicate.cancel()
         task.cancel()
         continuation?.resume(returning: .init(items: [person(1)], total: 1, limit: 50, offset: 0))
         await task.value
+        await duplicate.value
         #expect(model.state == .idle)
         #expect(model.items.isEmpty)
         #expect(!model.isLoading)
@@ -221,6 +224,50 @@ struct GalleryViewModelTests {
         #expect(model.state == .idle)
         #expect(!model.isLoading)
         #expect(!model.hasError)
+    }
+
+    @Test func reopeningPageWhileCancelledRequestUnwindsRestartsLoading() async {
+        var continuation: CheckedContinuation<MonekarAPI.Page<MonekarAPI.Person>, Never>?
+        var requests = 0
+        let model = PaginatedViewModel<MonekarAPI.Person> { limit, offset in
+            requests += 1
+            if requests == 1 {
+                return await withCheckedContinuation { continuation = $0 }
+            }
+            return .init(items: [person(2)], total: 1, limit: limit, offset: offset)
+        }
+        let original = Task { await model.loadIfNeeded() }
+        while continuation == nil { await Task.yield() }
+        original.cancel()
+        let reopened = Task { await model.loadIfNeeded() }
+        await Task.yield()
+        continuation?.resume(returning: .init(items: [person(1)], total: 1, limit: 50, offset: 0))
+        await original.value
+        await reopened.value
+        #expect(requests == 2)
+        #expect(model.state == .loaded([person(2)]))
+    }
+
+    @Test func reopeningDetailWhileCancelledRequestUnwindsRestartsLoading() async {
+        var continuation: CheckedContinuation<MonekarAPI.Person, Never>?
+        var requests = 0
+        let model = DetailViewModel {
+            requests += 1
+            if requests == 1 {
+                return await withCheckedContinuation { continuation = $0 }
+            }
+            return person(2)
+        }
+        let original = Task { await model.loadIfNeeded() }
+        while continuation == nil { await Task.yield() }
+        original.cancel()
+        let reopened = Task { await model.loadIfNeeded() }
+        await Task.yield()
+        continuation?.resume(returning: person(1))
+        await original.value
+        await reopened.value
+        #expect(requests == 2)
+        #expect(model.state == .loaded(person(2)))
     }
 
     @Test func browsingModelsUseTypedEndpointsAndServerFields() async throws {
@@ -315,6 +362,36 @@ struct GalleryViewModelTests {
         try metadata.remove()
         coordinator.connectionDidChange()
         #expect(coordinator.path.isEmpty)
+    }
+
+    @Test func connectionChangesInvalidateEveryWindowSharingTheAPI() async throws {
+        let (services, metadata) = galleryServices()
+        let first = AppCoordinator(services: services)
+        let second = AppCoordinator(services: services)
+        await second.people.loadIfNeeded()
+        let oldPeople = second.people
+        let oldPerson = second.person(id: 7)
+        second.showPerson(id: 7)
+        second.showAlbum(id: 9)
+        first.showConnection()
+        try metadata.save(ServerConnection(serverURL: "https://other.invalid", username: "other"))
+        services.api.configure(metadata.configuration)
+        first.connectionDidChange()
+        #expect(first.path == [.connection])
+        #expect(second.path.isEmpty)
+        #expect(second.people !== oldPeople)
+        #expect(second.people.state == .idle)
+        #expect(second.person(id: 7) !== oldPerson)
+        #expect(second.person(id: 7).selection == .albums)
+        let newPeople = second.people
+        first.connectionDidChange()
+        #expect(second.people === newPeople)
+        second.showPerson(id: 7)
+        try metadata.remove()
+        services.api.configure(nil)
+        first.connectionDidChange()
+        #expect(second.path.isEmpty)
+        #expect(second.people !== newPeople)
     }
 }
 

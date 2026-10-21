@@ -31,7 +31,10 @@ struct ContentView: View {
                             services: coordinator.services
                         )
                     case .connection:
-                        ConnectionView(services: coordinator.services) {
+                        ConnectionView(
+                            services: coordinator.services,
+                            onConnectionChanged: { coordinator.connectionDidChange() }
+                        ) {
                             Task {
                                 await coordinator.home.load()
                                 coordinator.connectionDidChange()
@@ -98,10 +101,16 @@ private struct HomeView: View {
 
 private struct ConnectionView: View {
     @State private var viewModel: ConnectionViewModel
+    let onConnectionChanged: () -> Void
     let done: () -> Void
 
-    init(services: AppServices, done: @escaping () -> Void) {
+    init(
+        services: AppServices,
+        onConnectionChanged: @escaping () -> Void = {},
+        done: @escaping () -> Void
+    ) {
         _viewModel = State(initialValue: ConnectionViewModel(services: services))
+        self.onConnectionChanged = onConnectionChanged
         self.done = done
     }
 
@@ -120,7 +129,10 @@ private struct ConnectionView: View {
                 .textContentType(.password)
 
                 Button(viewModel.hasSavedConnection ? "Verify & Sign In" : "Verify & Connect") {
-                    Task { await viewModel.verifyAndSave() }
+                    Task {
+                        await viewModel.verifyAndSave()
+                        onConnectionChanged()
+                    }
                 }
                 .disabled(viewModel.state == .checking)
                 .accessibilityIdentifier("verifyConnection")
@@ -148,7 +160,10 @@ private struct ConnectionView: View {
             if viewModel.hasSavedConnection {
                 Section {
                     Button("Remove connection", role: .destructive) {
-                        Task { await viewModel.removeConnection() }
+                        Task {
+                            await viewModel.removeConnection()
+                            onConnectionChanged()
+                        }
                     }
                     .accessibilityIdentifier("removeConnection")
                 }

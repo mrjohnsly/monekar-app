@@ -36,4 +36,5 @@ struct AppServices {
     let api: any APIService
     let credentials: any CredentialService
     let connectionMetadata: any ConnectionMetadataService
+    let navigationSession = AppNavigationSession()
 }

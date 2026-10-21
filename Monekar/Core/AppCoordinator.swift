@@ -22,6 +22,7 @@ final class AppCoordinator {
         home = HomeViewModel(services: services)
         people = PaginatedViewModel { try await services.api.people(limit: $0, offset: $1) }
         configuration = services.connectionMetadata.configuration
+        services.navigationSession.register(self)
     }
 
     func person(id: Int) -> PersonViewModel {
@@ -51,6 +52,10 @@ final class AppCoordinator {
     }
 
     func connectionDidChange() {
+        services.navigationSession.connectionDidChange()
+    }
+
+    fileprivate func synchronizeConnection() {
         let current = services.connectionMetadata.configuration
         guard current != configuration else { return }
         configuration = current
@@ -60,6 +65,7 @@ final class AppCoordinator {
         peopleDetails.removeAll()
         albumDetails.removeAll()
         path = path.last == .connection ? [.connection] : []
+        Task { await home.load() }
     }
 
     func showConnection() {
@@ -74,5 +80,30 @@ final class AppCoordinator {
 
     func reset() {
         path.removeAll()
+    }
+}
+
+@MainActor
+final class AppNavigationSession {
+    private final class Window {
+        weak var coordinator: AppCoordinator?
+
+        init(_ coordinator: AppCoordinator) {
+            self.coordinator = coordinator
+        }
+    }
+
+    private var windows: [Window] = []
+
+    func register(_ coordinator: AppCoordinator) {
+        windows.removeAll { $0.coordinator == nil }
+        windows.append(Window(coordinator))
+    }
+
+    func connectionDidChange() {
+        windows.removeAll { $0.coordinator == nil }
+        for window in windows {
+            window.coordinator?.synchronizeConnection()
+        }
     }
 }
