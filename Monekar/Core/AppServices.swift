@@ -10,6 +10,7 @@ protocol APIService {
     func verifyConnection(_ configuration: ServerConnection?) async throws
     func get(path: [String]) async throws -> Data
     func get(mediaReference: String) async throws -> Data
+    func request(_ request: APIRequest) async throws -> Data
 }
 
 @MainActor
