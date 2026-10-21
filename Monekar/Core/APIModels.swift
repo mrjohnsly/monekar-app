@@ -15,7 +15,7 @@ nonisolated enum MonekarAPI {
         let personID: Int
         let name: String
         let date: String?
-        let models: String?
+        let models: [String]?
         let photographer: String?
         let imageCount: Int
         let thumbnailURL: String

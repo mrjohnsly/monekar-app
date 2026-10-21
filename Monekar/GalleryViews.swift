@@ -170,7 +170,7 @@ struct AlbumDetailView: View {
                             Label(date, systemImage: "calendar")
                         }
                         if let models = album.models, !models.isEmpty {
-                            Text("Models: \(models)")
+                            Text("Models: \(models.joined(separator: ", "))")
                         }
                         if let photographer = album.photographer, !photographer.isEmpty {
                             Text("Photographer: \(photographer)")

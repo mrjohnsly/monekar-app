@@ -410,7 +410,7 @@ private final class GalleryAPI: APIService {
     var baseURL: URL? = URL(string: "https://example.invalid")
     var requests: [APIRequest] = []
     static let album = MonekarAPI.Album(
-        id: 9, personID: 7, name: "Server album", date: "2026-10-01", models: "Server models",
+        id: 9, personID: 7, name: "Server album", date: "2026-10-01", models: ["Server models"],
         photographer: "Server photographer", imageCount: 23, thumbnailURL: "/media/album-thumb"
     )
     private let image = MonekarAPI.Image(
