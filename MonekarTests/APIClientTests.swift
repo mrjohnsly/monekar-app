@@ -43,13 +43,31 @@ struct APIClientTests {
 
         transport.json = """
         {"id":8,"personID":7,"name":"Site - Set","date":"2026-10-21",
-        "models":"Person","photographer":"Photographer","imageCount":1,
+        "models":["Person","Another Person"],"photographer":"Photographer","imageCount":1,
         "thumbnailURL":"/api/v1/albums/8/thumbnail"}
         """
         let album = try await api.album(id: 8)
         #expect(album.date == "2026-10-21")
-        #expect(album.models == "Person")
+        #expect(album.models == ["Person", "Another Person"])
         #expect(album.photographer == "Photographer")
+    }
+
+    @Test(arguments: ["null", "[]", #"["Person"]"#, #"["Person","Another Person"]"#])
+    func albumListsAndDetailsDecodeServerModelsArrays(modelsJSON: String) async throws {
+        let (api, transport) = try client()
+        let json = Self.albumJSON.replacingOccurrences(of: "\"models\":null", with: "\"models\":\(modelsJSON)")
+        let expected = try JSONDecoder().decode([String]?.self, from: Data(modelsJSON.utf8))
+
+        transport.json = Self.page(json)
+        let page = try await api.albums(personID: 7, limit: 50, offset: 0)
+        let album = try #require(page.items.first)
+        #expect(album.models == expected)
+        #expect(album.id == 8)
+        #expect(album.imageCount == 1)
+        #expect(album.thumbnailURL == "/api/v1/albums/8/thumbnail")
+
+        transport.json = json
+        #expect(try await api.album(id: 8) == album)
     }
 
     @Test func decodesOptionalDimensionsLargeSizesAndEmbeddedTags() async throws {
