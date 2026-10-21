@@ -127,6 +127,10 @@ private final class StubAPI: APIService {
     func get(mediaReference: String) async throws -> Data {
         Data()
     }
+
+    func request(_ request: APIRequest) async throws -> Data {
+        Data()
+    }
 }
 
 @MainActor

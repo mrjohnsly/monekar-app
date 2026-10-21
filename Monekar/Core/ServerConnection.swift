@@ -59,6 +59,8 @@ enum ConnectionFailure: Error, Equatable {
     case certificateTrust
     case serverRejected(Int)
     case invalidResponse
+    case decodingFailed
+    case invalidPagination
     case storageFailure
     case credentialStorage(Int)
 
@@ -82,6 +84,10 @@ enum ConnectionFailure: Error, Equatable {
             "The server returned HTTP \(status). Check the server address and try again."
         case .invalidResponse:
             "The server returned an invalid response. Check that this is a monekar-server URL."
+        case .decodingFailed:
+            "The server response did not match the expected API format."
+        case .invalidPagination:
+            "Use a limit from 1 to 500 and a non-negative offset."
         case .storageFailure:
             "Monekar could not save the password in Keychain. Try again."
         case .credentialStorage(let status):

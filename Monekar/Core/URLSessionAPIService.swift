@@ -37,6 +37,21 @@ final class URLSessionAPIService: APIService {
         return try await perform(url: url, configuration: configuration, authenticated: true)
     }
 
+    func request(_ apiRequest: APIRequest) async throws -> Data {
+        guard let configuration else { throw ConnectionFailure.invalidURL }
+        let url = apiRequest.path.reduce(configuration.baseURL) { $0.appendingPathComponent($1) }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+            throw ConnectionFailure.invalidURL
+        }
+        if !apiRequest.queryItems.isEmpty { components.queryItems = apiRequest.queryItems }
+        guard let requestURL = components.url else { throw ConnectionFailure.invalidURL }
+        let isHealth = apiRequest.path == ["health"] && apiRequest.method == .get
+        return try await perform(
+            url: requestURL, configuration: configuration, authenticated: !isHealth,
+            method: apiRequest.method, body: apiRequest.body
+        )
+    }
+
     func get(mediaReference: String) async throws -> Data {
         guard let configuration,
               let url = URL(string: mediaReference, relativeTo: configuration.baseURL)?.absoluteURL else {
@@ -49,7 +64,9 @@ final class URLSessionAPIService: APIService {
     private func perform(
         url: URL,
         configuration: ServerConnection,
-        authenticated: Bool
+        authenticated: Bool,
+        method: HTTPMethod = .get,
+        body: Data? = nil
     ) async throws -> Data {
         guard let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
@@ -58,8 +75,14 @@ final class URLSessionAPIService: APIService {
             throw ConnectionFailure.invalidURL
         }
         var request = URLRequest(url: url, timeoutInterval: 15)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if authenticated, let password = try await credentials.password() {
+        request.httpMethod = method.rawValue
+        request.httpBody = body
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if authenticated {
+            guard let password = try await credentials.password(), !password.isEmpty else {
+                throw ConnectionFailure.missingPassword
+            }
             let userPassword = "\(configuration.username):\(password)"
             request.setValue(
                 "Basic \(Data(userPassword.utf8).base64EncodedString())",
@@ -157,6 +180,7 @@ private final class SameOriginRedirectDelegate: NSObject, URLSessionTaskDelegate
     ) {
         guard let originalURL = task.originalRequest?.url,
               let redirectedURL = request.url,
+              redirectedURL.user == nil, redirectedURL.password == nil,
               Self.sameOrigin(originalURL, redirectedURL) else {
             completionHandler(nil)
             return
