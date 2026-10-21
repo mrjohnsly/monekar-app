@@ -19,11 +19,12 @@ extension APIService {
     var mediaSessionID: UUID? { nil }
 
     func mediaResponse(reference: String, etag: String?) async throws -> MediaResponse {
+        guard let url = URL(string: reference) else { throw ConnectionFailure.invalidURL }
         let data = try await get(mediaReference: reference)
         return MediaResponse(
             data: data,
             response: HTTPURLResponse(
-                url: URL(string: reference)!, statusCode: 200, httpVersion: nil,
+                url: url, statusCode: 200, httpVersion: nil,
                 headerFields: ["Content-Type": "application/octet-stream"]
             )!
         )

@@ -1,9 +1,11 @@
 import Foundation
+import Observation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
 @MainActor
+@Observable
 final class URLSessionAPIService: APIService {
     private(set) var configuration: ServerConnection?
     private let credentials: any CredentialService
@@ -108,9 +110,12 @@ final class URLSessionAPIService: APIService {
         }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if authenticated {
+            let sessionID = mediaSessionID
             guard let password = try await credentials.password(), !password.isEmpty else {
                 throw ConnectionFailure.missingPassword
             }
+            try Task.checkCancellation()
+            guard sessionID == mediaSessionID else { throw CancellationError() }
             let userPassword = "\(configuration.username):\(password)"
             request.setValue(
                 "Basic \(Data(userPassword.utf8).base64EncodedString())",
@@ -201,7 +206,7 @@ private final class URLSessionHTTPTransport: HTTPTransport {
     }
 }
 
-private final class SameOriginRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class SameOriginRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,

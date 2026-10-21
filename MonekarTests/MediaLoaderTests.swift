@@ -134,6 +134,77 @@ struct MediaLoaderTests {
         #expect(transport.requests.last?.value(forHTTPHeaderField: "If-None-Match") == nil)
     }
 
+    @Test func explicitRetryBypassesCachedBytesAndValidators() async throws {
+        let transport = MediaTransport()
+        transport.headers["Cache-Control"] = "max-age=60"
+        transport.headers["ETag"] = "\"old\""
+        let loader = MediaLoader(api: try makeAPI(transport))
+        _ = try await loader.load(reference: "/a")
+        transport.body = Data([2])
+        #expect(try await loader.load(reference: "/a", reload: true).data == Data([2]))
+        #expect(transport.requests.count == 2)
+        #expect(transport.requests.last?.value(forHTTPHeaderField: "If-None-Match") == nil)
+    }
+
+    @Test func connectionChangeDuringCredentialReadPreventsSendingOldRequests() async throws {
+        let transport = MediaTransport()
+        let credentials = MediaCredentials()
+        let api = URLSessionAPIService(
+            configuration: try ServerConnection(baseURL: base, username: "alice"),
+            credentials: credentials, transport: transport
+        )
+        credentials.onRead = { api.configure(nil) }
+        await #expect(throws: CancellationError.self) {
+            try await api.mediaResponse(reference: "/a", etag: nil)
+        }
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test func connectionChangeDiscardsInFlightMedia() async throws {
+        let transport = MediaTransport()
+        transport.suspended = true
+        let api = try makeAPI(transport)
+        let loader = MediaLoader(api: api)
+        let task = Task { try await loader.load(reference: "/a") }
+        while transport.requests.isEmpty { await Task.yield() }
+        api.configure(api.configuration)
+        transport.resume()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        transport.suspended = false
+        transport.body = Data([2])
+        #expect(try await loader.load(reference: "/a").data == Data([2]))
+    }
+
+    @Test(arguments: [
+        "https://server.local/proxy/redirect",
+        "https://server.local:443/proxy/redirect",
+        "https://other.local/image",
+        "http://server.local/image",
+        "https://server.local:444/image",
+        "https://" + "alice" + ":" + "secret" + "@server.local/image",
+    ])
+    func redirectAuthenticationStaysOnOrigin(_ destination: String) async throws {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        var original = URLRequest(url: base)
+        original.setValue("Basic test-value", forHTTPHeaderField: "Authorization")
+        let task = session.dataTask(with: original)
+        let request = URLRequest(url: URL(string: destination)!)
+        let response = HTTPURLResponse(url: base, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        let redirected: URLRequest? = await withCheckedContinuation { continuation in
+            SameOriginRedirectDelegate().urlSession(
+                session, task: task, willPerformHTTPRedirection: response, newRequest: request,
+                completionHandler: { continuation.resume(returning: $0) }
+            )
+        }
+        if destination == "https://server.local/proxy/redirect"
+            || destination == "https://server.local:443/proxy/redirect" {
+            #expect(redirected?.value(forHTTPHeaderField: "Authorization") == "Basic test-value")
+        } else {
+            #expect(redirected == nil)
+        }
+    }
+
     @Test func failuresAndUnexpected304CanBeRetried() async throws {
         let transport = MediaTransport()
         let loader = MediaLoader(api: try makeAPI(transport))
@@ -193,7 +264,11 @@ struct MediaLoaderTests {
 
 @MainActor
 private final class MediaCredentials: CredentialService {
-    func password() async throws -> String? { "p:a:ss" }
+    var onRead: (() -> Void)?
+    func password() async throws -> String? {
+        onRead?()
+        return "p:a:ss"
+    }
     func setPassword(_ password: String?) async throws {}
 }
 

@@ -1,9 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 private let galleryColumns = [GridItem(.adaptive(minimum: 160, maximum: 240), spacing: 16)]
 
@@ -23,6 +18,7 @@ struct PeopleView: View {
                             GalleryThumbnail(
                                 reference: person.thumbnailURL,
                                 services: coordinator.services,
+                                label: person.name,
                                 open: { coordinator.showPerson(id: person.id) }
                             )
                             Button {
@@ -229,6 +225,7 @@ private struct AlbumGrid: View {
                         GalleryThumbnail(
                             reference: album.thumbnailURL,
                             services: coordinator.services,
+                            label: album.name,
                             open: { coordinator.showAlbum(id: album.id) }
                         )
                         Button {
@@ -266,14 +263,31 @@ private struct AlbumGrid: View {
 private struct ImageGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
     let services: AppServices
+    @State private var selectedImage: MonekarAPI.Image?
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
+
+    private func open(_ image: MonekarAPI.Image) {
+        #if os(macOS)
+        openWindow(value: image)
+        #else
+        selectedImage = image
+        #endif
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 20) {
                 ForEach(viewModel.items) { image in
                     VStack(alignment: .leading, spacing: 6) {
-                        GalleryThumbnail(reference: image.thumbnailURL, services: services)
-                        Text(image.fileName).font(.headline).lineLimit(2)
+                        GalleryThumbnail(
+                            reference: image.thumbnailURL, services: services, label: image.fileName,
+                            open: { open(image) }
+                        )
+                        Button(image.fileName) { open(image) }
+                            .font(.headline).lineLimit(2).buttonStyle(.plain)
+                            .accessibilityLabel("Open image: \(image.fileName)")
                         Text("\(image.format) · \(ByteCountFormatter.string(fromByteCount: image.byteSize, countStyle: .file))")
                             .font(.caption).foregroundStyle(.secondary)
                         if let width = image.width, let height = image.height {
@@ -301,6 +315,11 @@ private struct ImageGrid: View {
                 loadMore: { await viewModel.loadMore() }
             )
         }
+        #if os(iOS)
+        .fullScreenCover(item: $selectedImage) { image in
+            ImageViewer(image: image, services: services)
+        }
+        #endif
     }
 }
 
@@ -366,74 +385,41 @@ private struct GalleryEmptyView: View {
 private struct GalleryThumbnail: View {
     let reference: String
     let services: AppServices
+    let label: String
     var open: (() -> Void)?
-    @State private var image: SwiftUI.Image?
-    @State private var isLoading = true
-    @State private var hasFailed = false
-    @State private var attempt = 0
+    @Environment(\.displayScale) private var displayScale
+
+    private func size(for width: CGFloat) -> MonekarAPI.ThumbnailSize {
+        let pixels = width * displayScale
+        return MonekarAPI.ThumbnailSize.allCases.first { CGFloat($0.rawValue) >= pixels } ?? .extraLarge
+    }
 
     var body: some View {
         Rectangle()
             .fill(.quaternary)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                if hasFailed {
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo")
-                        Button("Retry thumbnail") { attempt += 1 }
-                            .buttonStyle(.bordered)
+                GeometryReader { geometry in
+                    AuthenticatedImageView(
+                        reference: reference, loader: services.media, label: label,
+                        thumbnailSize: size(for: geometry.size.width),
+                        maxPixelSize: size(for: geometry.size.width).rawValue
+                    )
+                    .overlay(alignment: .bottomTrailing) {
+                        if let open {
+                            Button(action: open) {
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .padding(10)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityLabel("Open \(label)")
+                            .padding(6)
+                        }
                     }
-                } else if let open {
-                    Button(action: open) {
-                        thumbnailContent
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open details")
-                } else {
-                    thumbnailContent
+                    .contentShape(Rectangle())
+                    .onTapGesture { open?() }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            .accessibilityLabel("Thumbnail")
-            .task(id: "\(attempt):\(reference)") { await load() }
-    }
-
-    @ViewBuilder
-    private var thumbnailContent: some View {
-        if let image {
-            image.resizable().scaledToFill()
-        } else if isLoading {
-            ProgressView()
-        } else {
-            Image(systemName: "photo")
-        }
-    }
-
-    private func load() async {
-        image = nil
-        hasFailed = false
-        isLoading = true
-        do {
-            let data = try await services.api.get(mediaReference: reference)
-            try Task.checkCancellation()
-            #if canImport(UIKit)
-            if let decoded = UIImage(data: data) {
-                image = SwiftUI.Image(uiImage: decoded)
-            }
-            #elseif canImport(AppKit)
-            if let decoded = NSImage(data: data) {
-                image = SwiftUI.Image(nsImage: decoded)
-            }
-            #endif
-            hasFailed = image == nil
-            isLoading = false
-        } catch is CancellationError {
-            isLoading = false
-        } catch {
-            hasFailed = true
-            isLoading = false
-        }
     }
 }

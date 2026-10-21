@@ -100,6 +100,7 @@ final class MediaLoader {
     private var cache: [URL: Entry] = [:]
     private var pending: [URL: Pending] = [:]
     private var clock: UInt64 = 0
+    var connectionID: UUID? { api.mediaSessionID }
 
     init(api: any APIService, byteLimit: Int = 32 * 1024 * 1024, now: @escaping () -> Date = Date.init) {
         self.api = api
@@ -108,7 +109,9 @@ final class MediaLoader {
         sessionID = api.mediaSessionID
     }
 
-    func load(reference: String, size: MonekarAPI.ThumbnailSize? = nil) async throws -> MediaResource {
+    func load(
+        reference: String, size: MonekarAPI.ThumbnailSize? = nil, reload: Bool = false
+    ) async throws -> MediaResource {
         try Task.checkCancellation()
         if sessionID != api.mediaSessionID {
             pending.values.forEach { $0.task.cancel() }
@@ -118,6 +121,7 @@ final class MediaLoader {
         }
         guard let baseURL = api.baseURL else { throw ConnectionFailure.invalidURL }
         let url = try MediaURL.resolve(reference, baseURL: baseURL, size: size)
+        if reload { cache.removeValue(forKey: url) }
         clock &+= 1
         if var entry = cache[url], entry.expires > now() {
             entry.accessed = clock
