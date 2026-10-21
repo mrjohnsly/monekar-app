@@ -9,8 +9,10 @@ enum AppRoute: Hashable {
 final class AppCoordinator {
     var path: [AppRoute] = []
     let home: HomeViewModel
+    let services: AppServices
 
     init(services: AppServices) {
+        self.services = services
         home = HomeViewModel(services: services)
     }
 

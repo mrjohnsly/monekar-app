@@ -39,16 +39,16 @@ struct AppFoundationTests {
     }
 
     @Test func configuredLaunchLoadsConnection() async {
-        let credentials = StubCredentials(token: "test-value")
+        let credentials = StubCredentials(password: "test-value")
         let model = HomeViewModel(services: services(url: serverURL, credentials: credentials))
         await model.load()
         #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: true)))
     }
 
     @Test(arguments: [nil, ""])
-    func missingCredentialRequiresSignIn(token: String?) async {
+    func missingCredentialRequiresSignIn(password: String?) async {
         let model = HomeViewModel(services: services(
-            url: serverURL, credentials: StubCredentials(token: token)
+            url: serverURL, credentials: StubCredentials(password: password)
         ))
         await model.load()
         #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: false)))
@@ -93,7 +93,10 @@ struct AppFoundationTests {
     private func services(
         url: URL? = nil, credentials: StubCredentials = StubCredentials()
     ) -> AppServices {
-        AppServices(api: StubAPI(baseURL: url), credentials: credentials)
+        let configuration = url.flatMap { try? ServerConnection(baseURL: $0, username: "user") }
+        let metadata = StubMetadata(configuration: configuration)
+        let api = StubAPI(configuration: configuration)
+        return AppServices(api: api, credentials: credentials, connectionMetadata: metadata)
     }
 }
 
@@ -102,33 +105,66 @@ private enum StubError: Error {
 }
 
 @MainActor
-private struct StubAPI: APIService {
-    let baseURL: URL?
+private final class StubAPI: APIService {
+    private(set) var configuration: ServerConnection?
+
+    init(configuration: ServerConnection?) {
+        self.configuration = configuration
+    }
+
+    var baseURL: URL? { configuration?.baseURL }
+
+    func configure(_ configuration: ServerConnection?) {
+        self.configuration = configuration
+    }
+
+    func verifyConnection(_ configuration: ServerConnection?) async throws {}
 
     func get(path: [String]) async throws -> Data {
+        Data()
+    }
+
+    func get(mediaReference: String) async throws -> Data {
         Data()
     }
 }
 
 @MainActor
 private final class StubCredentials: CredentialService {
-    var token: String?
+    var storedPassword: String?
     var error: (any Error)?
     var onRead: (() async -> Void)?
     var readCount = 0
 
-    init(token: String? = nil) {
-        self.token = token
+    init(password: String? = nil) {
+        self.storedPassword = password
     }
 
-    func accessToken() async throws -> String? {
+    func password() async throws -> String? {
         readCount += 1
         await onRead?()
         if let error { throw error }
-        return token
+        return storedPassword
     }
 
-    func setAccessToken(_ token: String?) async throws {
-        self.token = token
+    func setPassword(_ password: String?) async throws {
+        storedPassword = password
+    }
+}
+
+@MainActor
+private final class StubMetadata: ConnectionMetadataService {
+    var configuration: ServerConnection?
+
+    init(configuration: ServerConnection?) {
+        self.configuration = configuration
+    }
+
+    func save(_ configuration: ServerConnection) throws {
+        self.configuration = configuration
+    }
+
+    func remove() throws {
+        configuration = nil
     }
 }

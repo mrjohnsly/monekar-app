@@ -21,8 +21,11 @@ struct ContentView: View {
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
                     case .connection:
-                        ConnectionView(state: coordinator.home.state) {
-                            coordinator.pop()
+                        ConnectionView(services: coordinator.services) {
+                            Task {
+                                await coordinator.home.load()
+                                coordinator.pop()
+                            }
                         }
                     }
                 }
@@ -42,7 +45,7 @@ private struct HomeView: View {
                 ContentUnavailableView(
                     "No server configured",
                     systemImage: "network",
-                    description: Text("Set MonekarServerURL in the app configuration to connect to monekar-server.")
+                    description: Text("Set up a local-network or Tailscale server connection to get started.")
                 )
             case .loaded(let summary):
                 VStack(spacing: 12) {
@@ -51,7 +54,11 @@ private struct HomeView: View {
                     Text("Ready to connect")
                         .font(.title)
                     Text(summary.serverURL.host() ?? "monekar-server")
-                    Text(summary.hasCredential ? "Credential available" : "Sign-in required")
+                    Text(summary.hasCredential ? "Credentials stored in Keychain" : "Sign-in required")
+                    if !summary.hasCredential {
+                        Text("Open Connection to sign in again.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             case .failed:
                 ContentUnavailableView {
@@ -73,17 +80,63 @@ private struct HomeView: View {
 }
 
 private struct ConnectionView: View {
-    let state: LoadState<ConnectionSummary>
+    @State private var viewModel: ConnectionViewModel
     let done: () -> Void
 
+    init(services: AppServices, done: @escaping () -> Void) {
+        _viewModel = State(initialValue: ConnectionViewModel(services: services))
+        self.done = done
+    }
+
     var body: some View {
+        @Bindable var viewModel = viewModel
         Form {
-            if case .loaded(let summary) = state {
-                LabeledContent("Server", value: summary.serverURL.host() ?? "monekar-server")
-                LabeledContent("Authentication", value: summary.hasCredential ? "Credential available" : "Sign-in required")
-            } else {
-                Text("Configure MonekarServerURL to use your monekar-server instance. Credentials are stored in Keychain.")
+            Section("Server connection") {
+                TextField("http://server.local:8080", text: $viewModel.serverURL)
+                    .textContentType(.URL)
+                TextField("Username", text: $viewModel.username)
+                    .textContentType(.username)
+                SecureField(
+                    viewModel.hasSavedConnection ? "Password (blank keeps saved password)" : "Password",
+                    text: $viewModel.password
+                )
+                .textContentType(.password)
+
+                Button(viewModel.hasSavedConnection ? "Verify & Sign In" : "Verify & Connect") {
+                    Task { await viewModel.verifyAndSave() }
+                }
+                .disabled(viewModel.state == .checking)
+                .accessibilityIdentifier("verifyConnection")
+
+                if viewModel.state == .checking {
+                    ProgressView("Checking server…")
+                } else if viewModel.state == .connected {
+                    Text("Server is reachable. Protected requests use HTTP Basic credentials.")
+                        .foregroundStyle(.green)
+                } else if case .failed(let failure) = viewModel.state {
+                    Text(failure.message)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("connectionError")
+                } else if viewModel.state == .removed {
+                    Text("Connection removed.")
+                        .foregroundStyle(.secondary)
+                }
             }
+
+            Section("Network and security") {
+                Text("HTTP Basic credentials are not encrypted by HTTP. Use HTTP only on a trusted local network or Tailscale. HTTPS uses normal system certificate validation; a direct local or Tailscale connection does not need an HTTPS certificate.")
+                Text("Allow Monekar to access your local network when iOS or iPadOS asks. If access is denied, enable it in Settings > Privacy & Security > Local Network.")
+            }
+
+            if viewModel.hasSavedConnection {
+                Section {
+                    Button("Remove connection", role: .destructive) {
+                        Task { await viewModel.removeConnection() }
+                    }
+                    .accessibilityIdentifier("removeConnection")
+                }
+            }
+
             Button("Done", action: done)
                 .accessibilityIdentifier("closeConnection")
         }

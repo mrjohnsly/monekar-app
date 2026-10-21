@@ -8,7 +8,7 @@ struct CredentialError: Error {
 @MainActor
 final class KeychainCredentialService: CredentialService {
     private let service: String
-    private let account = "access-token"
+    private let account = "server-password"
 
     init(service: String) {
         self.service = service
@@ -23,7 +23,7 @@ final class KeychainCredentialService: CredentialService {
         ]
     }
 
-    func accessToken() async throws -> String? {
+    func password() async throws -> String? {
         var query = query
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -32,21 +32,21 @@ final class KeychainCredentialService: CredentialService {
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else { throw CredentialError(status: status) }
         guard let data = result as? Data,
-              let token = String(data: data, encoding: .utf8) else {
+              let password = String(data: data, encoding: .utf8) else {
             throw CredentialError(status: errSecDecode)
         }
-        return token
+        return password
     }
 
-    func setAccessToken(_ token: String?) async throws {
-        guard let token else {
+    func setPassword(_ password: String?) async throws {
+        guard let password else {
             let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else {
                 throw CredentialError(status: status)
             }
             return
         }
-        let attributes = [kSecValueData as String: Data(token.utf8)]
+        let attributes = [kSecValueData as String: Data(password.utf8)]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
             var item = query
