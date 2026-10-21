@@ -10,7 +10,7 @@ struct ContentView: View {
     var body: some View {
         @Bindable var coordinator = coordinator
         NavigationStack(path: $coordinator.path) {
-            HomeView(viewModel: coordinator.home)
+            HomeView(coordinator: coordinator)
                 .navigationTitle("Monekar")
                 .toolbar {
                     Button("Connection", systemImage: "network") {
@@ -20,12 +20,27 @@ struct ContentView: View {
                 }
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
+                    case .person(let id):
+                        PersonDetailView(
+                            viewModel: coordinator.person(id: id),
+                            coordinator: coordinator
+                        )
+                    case .album(let id):
+                        AlbumDetailView(
+                            viewModel: coordinator.album(id: id),
+                            services: coordinator.services
+                        )
                     case .connection:
                         ConnectionView(services: coordinator.services) {
                             Task {
                                 await coordinator.home.load()
+                                coordinator.connectionDidChange()
                                 coordinator.pop()
                             }
+                        }
+                        .onDisappear {
+                            coordinator.connectionDidChange()
+                            Task { await coordinator.home.load() }
                         }
                     }
                 }
@@ -34,7 +49,9 @@ struct ContentView: View {
 }
 
 private struct HomeView: View {
-    let viewModel: HomeViewModel
+    let coordinator: AppCoordinator
+
+    private var viewModel: HomeViewModel { coordinator.home }
 
     var body: some View {
         Group {
@@ -48,14 +65,15 @@ private struct HomeView: View {
                     description: Text("Set up a local-network or Tailscale server connection to get started.")
                 )
             case .loaded(let summary):
-                VStack(spacing: 12) {
-                    Image(systemName: "server.rack")
-                        .font(.largeTitle)
-                    Text("Ready to connect")
-                        .font(.title)
-                    Text(summary.serverURL.host() ?? "monekar-server")
-                    Text(summary.hasCredential ? "Credentials stored in Keychain" : "Sign-in required")
-                    if !summary.hasCredential {
+                if summary.hasCredential {
+                    PeopleView(coordinator: coordinator)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "server.rack")
+                            .font(.largeTitle)
+                        Text("Sign-in required")
+                            .font(.title)
+                        Text(summary.serverURL.host() ?? "monekar-server")
                         Text("Open Connection to sign in again.")
                             .foregroundStyle(.secondary)
                     }
@@ -73,7 +91,6 @@ private struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
         .accessibilityIdentifier("homeScreen")
         .task { await viewModel.load() }
     }
