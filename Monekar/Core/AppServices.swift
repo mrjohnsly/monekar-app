@@ -11,6 +11,23 @@ protocol APIService {
     func get(path: [String]) async throws -> Data
     func get(mediaReference: String) async throws -> Data
     func request(_ request: APIRequest) async throws -> Data
+    var mediaSessionID: UUID? { get }
+    func mediaResponse(reference: String, etag: String?) async throws -> MediaResponse
+}
+
+extension APIService {
+    var mediaSessionID: UUID? { nil }
+
+    func mediaResponse(reference: String, etag: String?) async throws -> MediaResponse {
+        let data = try await get(mediaReference: reference)
+        return MediaResponse(
+            data: data,
+            response: HTTPURLResponse(
+                url: URL(string: reference)!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/octet-stream"]
+            )!
+        )
+    }
 }
 
 @MainActor
@@ -37,4 +54,12 @@ struct AppServices {
     let credentials: any CredentialService
     let connectionMetadata: any ConnectionMetadataService
     let navigationSession = AppNavigationSession()
+    let media: MediaLoader
+
+    init(api: any APIService, credentials: any CredentialService, connectionMetadata: any ConnectionMetadataService) {
+        self.api = api
+        self.credentials = credentials
+        self.connectionMetadata = connectionMetadata
+        media = MediaLoader(api: api)
+    }
 }

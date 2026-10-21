@@ -8,6 +8,7 @@ final class URLSessionAPIService: APIService {
     private(set) var configuration: ServerConnection?
     private let credentials: any CredentialService
     private let transport: any HTTPTransport
+    private(set) var mediaSessionID: UUID? = UUID()
 
     var baseURL: URL? { configuration?.baseURL }
 
@@ -23,6 +24,7 @@ final class URLSessionAPIService: APIService {
 
     func configure(_ configuration: ServerConnection?) {
         self.configuration = configuration
+        mediaSessionID = UUID()
     }
 
     func verifyConnection(_ configuration: ServerConnection?) async throws {
@@ -61,6 +63,14 @@ final class URLSessionAPIService: APIService {
         return try await perform(url: url, configuration: configuration, authenticated: authenticated)
     }
 
+    func mediaResponse(reference: String, etag: String?) async throws -> MediaResponse {
+        guard let configuration else { throw ConnectionFailure.invalidURL }
+        let url = try MediaURL.resolve(reference, baseURL: configuration.baseURL)
+        return try await performResponse(
+            url: url, configuration: configuration, authenticated: true, etag: etag, media: true
+        )
+    }
+
     private func perform(
         url: URL,
         configuration: ServerConnection,
@@ -68,6 +78,20 @@ final class URLSessionAPIService: APIService {
         method: HTTPMethod = .get,
         body: Data? = nil
     ) async throws -> Data {
+        try await performResponse(
+            url: url, configuration: configuration, authenticated: authenticated, method: method, body: body
+        ).data
+    }
+
+    private func performResponse(
+        url: URL,
+        configuration: ServerConnection,
+        authenticated: Bool,
+        method: HTTPMethod = .get,
+        body: Data? = nil,
+        etag: String? = nil,
+        media: Bool = false
+    ) async throws -> MediaResponse {
         guard let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               url.host != nil,
@@ -78,6 +102,10 @@ final class URLSessionAPIService: APIService {
         request.httpMethod = method.rawValue
         request.httpBody = body
         request.setValue("*/*", forHTTPHeaderField: "Accept")
+        if media {
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if authenticated {
             guard let password = try await credentials.password(), !password.isEmpty else {
@@ -96,10 +124,10 @@ final class URLSessionAPIService: APIService {
                 throw ConnectionFailure.invalidResponse
             }
             if response.statusCode == 401 { throw ConnectionFailure.unauthorized }
-            guard (200..<300).contains(response.statusCode) else {
+            guard (200..<300).contains(response.statusCode) || (media && response.statusCode == 304) else {
                 throw ConnectionFailure.serverRejected(response.statusCode)
             }
-            return data
+            return MediaResponse(data: data, response: response)
         } catch is CancellationError {
             throw CancellationError()
         } catch let failure as ConnectionFailure {
@@ -158,8 +186,11 @@ private final class URLSessionHTTPTransport: HTTPTransport {
     private let session: URLSession
 
     init() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.urlCredentialStorage = nil
         session = URLSession(
-            configuration: .default,
+            configuration: configuration,
             delegate: SameOriginRedirectDelegate(),
             delegateQueue: nil
         )
@@ -184,6 +215,10 @@ private final class SameOriginRedirectDelegate: NSObject, URLSessionTaskDelegate
               Self.sameOrigin(originalURL, redirectedURL) else {
             completionHandler(nil)
             return
+        }
+        var request = request
+        if let authorization = task.originalRequest?.value(forHTTPHeaderField: "Authorization") {
+            request.setValue(authorization, forHTTPHeaderField: "Authorization")
         }
         completionHandler(request)
     }
