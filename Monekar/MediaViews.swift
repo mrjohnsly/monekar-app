@@ -172,11 +172,11 @@ struct ImageViewer: View {
         .focusable()
         .focused($isFocused)
         .onAppear { isFocused = true }
-        .onKeyPress(.leftArrow) { _ in
+        .onKeyPress(.leftArrow) {
             showPreviousImage()
             return .handled
         }
-        .onKeyPress(.rightArrow) { _ in
+        .onKeyPress(.rightArrow) {
             showNextImage()
             return .handled
         }

@@ -71,7 +71,7 @@ struct ContentView: View {
                     }
                 }
         }
-        .toolbar(imageViewerSelection == nil ? .automatic : .hidden, for: .navigationBar)
+        .toolbar(imageViewerSelection == nil ? .automatic : .hidden)
         .overlay {
             if let selection = imageViewerSelection {
                 ImageViewer(selection: selection, services: coordinator.services) {
