@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var coordinator: AppCoordinator
+    @State private var imageViewerSelection: ImageViewerSelection?
 
     init(services: AppServices) {
         _coordinator = State(initialValue: AppCoordinator(services: services))
@@ -29,24 +30,28 @@ struct ContentView: View {
                     case .person(let id):
                         PersonDetailView(
                             viewModel: coordinator.person(id: id),
-                            coordinator: coordinator
+                            coordinator: coordinator,
+                            onOpenImage: { imageViewerSelection = $0 }
                         )
                     case .album(let id):
                         AlbumDetailView(
                             viewModel: coordinator.album(id: id),
-                            services: coordinator.services
+                            services: coordinator.services,
+                            onOpenImage: { imageViewerSelection = $0 }
                         )
                     case .favourites:
                         ImageFeedView(
                             title: "Favourites", viewModel: coordinator.favourites,
-                            services: coordinator.services
+                            services: coordinator.services,
+                            onOpenImage: { imageViewerSelection = $0 }
                         )
                     case .tags:
                         TagsView(coordinator: coordinator)
                     case .tag(let tag):
                         ImageFeedView(
                             title: tag.name, viewModel: coordinator.tagImages(id: tag.id),
-                            services: coordinator.services
+                            services: coordinator.services,
+                            onOpenImage: { imageViewerSelection = $0 }
                         )
                     case .connection:
                         ConnectionView(
@@ -65,6 +70,16 @@ struct ContentView: View {
                         }
                     }
                 }
+        }
+        .overlay {
+            if let selection = imageViewerSelection {
+                ImageViewer(selection: selection, services: coordinator.services) {
+                    imageViewerSelection = nil
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .ignoresSafeArea()
+            }
         }
     }
 }

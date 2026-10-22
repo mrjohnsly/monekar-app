@@ -90,15 +90,16 @@ struct ImageViewerSelection: Identifiable {
 struct ImageViewer: View {
     let selection: ImageViewerSelection
     let services: AppServices
-    @Environment(\.dismiss) private var dismiss
+    let onDismiss: () -> Void
     @State private var zoom: CGFloat = 1
     @GestureState private var magnification: CGFloat = 1
     @State private var selectedIndex: Int
     @FocusState private var isFocused: Bool
 
-    init(selection: ImageViewerSelection, services: AppServices) {
+    init(selection: ImageViewerSelection, services: AppServices, onDismiss: @escaping () -> Void) {
         self.selection = selection
         self.services = services
+        self.onDismiss = onDismiss
         _selectedIndex = State(
             initialValue: selection.images.firstIndex { $0.id == selection.selectedImageID } ?? 0
         )
@@ -152,7 +153,7 @@ struct ImageViewer: View {
             .navigationTitle(image.fileName)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Close", systemImage: "xmark") { dismiss() }
+                    Button("Close", systemImage: "xmark", action: onDismiss)
                         .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("closeImageViewer")
                 }
@@ -167,7 +168,7 @@ struct ImageViewer: View {
         }
         .preferredColorScheme(.dark)
         .accessibilityIdentifier("imageViewer")
-        .onChange(of: services.api.mediaSessionID) { _, _ in dismiss() }
+        .onChange(of: services.api.mediaSessionID) { _, _ in onDismiss() }
         .focusable()
         .focused($isFocused)
         .onAppear { isFocused = true }

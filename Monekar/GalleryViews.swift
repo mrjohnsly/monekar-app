@@ -71,10 +71,11 @@ struct ImageFeedView: View {
     let title: String
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
     let services: AppServices
+    let onOpenImage: (ImageViewerSelection) -> Void
 
     var body: some View {
         ScrollView {
-            ImageGrid(viewModel: viewModel, services: services)
+            ImageGrid(viewModel: viewModel, services: services, onOpenImage: onOpenImage)
                 .padding()
         }
         .navigationTitle(title)
@@ -125,6 +126,7 @@ struct TagsView: View {
 struct PersonDetailView: View {
     let viewModel: PersonViewModel
     let coordinator: AppCoordinator
+    let onOpenImage: (ImageViewerSelection) -> Void
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -162,7 +164,10 @@ struct PersonDetailView: View {
                 case .albums:
                     AlbumGrid(viewModel: viewModel.albums, coordinator: coordinator)
                 case .images:
-                    ImageGrid(viewModel: viewModel.images, services: coordinator.services)
+                    ImageGrid(
+                        viewModel: viewModel.images, services: coordinator.services,
+                        onOpenImage: onOpenImage
+                    )
                 }
             }
             .padding()
@@ -208,6 +213,7 @@ struct PersonDetailView: View {
 struct AlbumDetailView: View {
     let viewModel: AlbumViewModel
     let services: AppServices
+    let onOpenImage: (ImageViewerSelection) -> Void
 
     var body: some View {
         ScrollView {
@@ -241,7 +247,7 @@ struct AlbumDetailView: View {
                         await viewModel.detail.refresh()
                     }
                 }
-                ImageGrid(viewModel: viewModel.images, services: services)
+                ImageGrid(viewModel: viewModel.images, services: services, onOpenImage: onOpenImage)
             }
             .padding()
         }
@@ -320,11 +326,11 @@ private struct AlbumGrid: View {
 private struct ImageGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
     let services: AppServices
-    @State private var selection: ImageViewerSelection?
+    let onOpenImage: (ImageViewerSelection) -> Void
 
     private func open(_ image: MonekarAPI.Image) {
         let images = viewModel.items.map { services.imageLibrary.model(for: $0).image }
-        selection = ImageViewerSelection(images: images, selectedImageID: image.id)
+        onOpenImage(ImageViewerSelection(images: images, selectedImageID: image.id))
     }
 
     var body: some View {
@@ -365,9 +371,6 @@ private struct ImageGrid: View {
                 retry: { await viewModel.retry() },
                 loadMore: { await viewModel.loadMore() }
             )
-        }
-        .sheet(item: $selection) { selection in
-            ImageViewer(selection: selection, services: services)
         }
     }
 }
