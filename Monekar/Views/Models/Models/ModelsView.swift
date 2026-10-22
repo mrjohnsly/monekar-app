@@ -13,9 +13,16 @@ struct ModelsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                ForEach(viewModel.models) { model in
-                    NavigationLink(value: model) {
-                        ModelThumbnail(model: model)
+                LazyVStack {
+                    ForEach(viewModel.models) { model in
+                        NavigationLink(value: model) {
+                            ModelThumbnail(model: model)
+                        }
+                        .task {
+                            if model.id == viewModel.models.last?.id {
+                                await viewModel.fetchModels()
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -27,7 +34,9 @@ struct ModelsView: View {
             .navigationTitle("Models")
         }
         .task {
-            await viewModel.fetchModels()
+            if viewModel.models.isEmpty {
+                await viewModel.fetchModels()
+            }
         }
     }
 }
