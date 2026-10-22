@@ -11,15 +11,12 @@ final class KeychainCredentialService: CredentialService {
     }
 
     private var query: [String: Any] {
-        var query: [String: Any] = [
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true,
         ]
-        #if os(iOS)
-        query[kSecUseDataProtectionKeychain as String] = true
-        #endif
-        return query
     }
 
     func password() async throws -> String? {
@@ -50,9 +47,7 @@ final class KeychainCredentialService: CredentialService {
         if status == errSecItemNotFound {
             var item = query
             item.merge(attributes) { _, new in new }
-            #if os(iOS)
             item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            #endif
             let addStatus = SecItemAdd(item as CFDictionary, nil)
             guard addStatus == errSecSuccess else { throw CredentialError(status: Int(addStatus)) }
         } else if status != errSecSuccess {
