@@ -2,6 +2,18 @@ import XCTest
 
 @MainActor
 final class LaunchNavigationTests: XCTestCase {
+    func testLibraryScanIsReachable() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let scan = app.buttons["showLibraryScan"]
+        XCTAssertTrue(scan.waitForExistence(timeout: 10))
+        scan.tap()
+
+        XCTAssertTrue(app.buttons["Refresh Status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["rescanLibrary"].exists)
+    }
+
     func testLaunchAndReturnFromConnection() {
         let app = XCUIApplication()
         app.launch()
