@@ -48,6 +48,54 @@ struct AppFoundationTests {
         #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: true)))
     }
 
+    @Test func returningToBrowsingDoesNotReplaceTheLoadedConnectionGate() async {
+        let credentials = StubCredentials(password: "test-value")
+        let model = HomeViewModel(services: services(url: serverURL, credentials: credentials))
+        await model.loadIfNeeded()
+        let loadedState = model.state
+        credentials.onRead = {
+            Issue.record("Returning to the navigation root must not recheck credentials.")
+        }
+
+        await model.loadIfNeeded()
+
+        #expect(credentials.readCount == 1)
+        #expect(model.state == loadedState)
+    }
+
+    @Test func cancelledInitialConnectionGateCanLoadAgain() async {
+        let credentials = StubCredentials(password: "test-value")
+        let model = HomeViewModel(services: services(url: serverURL, credentials: credentials))
+        credentials.error = CancellationError()
+        await model.loadIfNeeded()
+        #expect(model.state == .idle)
+
+        credentials.error = nil
+        await model.loadIfNeeded()
+        #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: true)))
+    }
+
+    #if DEBUG
+    @Test func modelNavigationFixtureLoadsWithoutARealServerOrCredentials() async throws {
+        let services = ModelNavigationTestServices.make()
+        let gate = HomeViewModel(services: services)
+        let models = ModelsViewModel(api: services.api)
+        await gate.loadIfNeeded()
+        await models.fetchPeople()
+        let person = try #require(models.people.first)
+        #expect(models.people.map(\.id) == [7])
+        #expect(models.people.first?.name == "Navigation model")
+        let detail = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
+        await detail.detail.loadIfNeeded()
+        await detail.albums.loadIfNeeded()
+        #expect(detail.detail.state == .loaded(person))
+        #expect(detail.albums.state == .empty)
+        #expect(gate.state == .loaded(ConnectionSummary(
+            serverURL: services.api.baseURL!, hasCredential: true
+        )))
+    }
+    #endif
+
     @Test(arguments: [nil, ""])
     func missingCredentialRequiresSignIn(password: String?) async {
         let model = HomeViewModel(services: services(

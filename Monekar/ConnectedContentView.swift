@@ -47,6 +47,6 @@ struct ConnectedContentView<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task { await viewModel.load() }
+        .task { await viewModel.loadIfNeeded() }
     }
 }

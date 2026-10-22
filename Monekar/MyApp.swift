@@ -4,6 +4,12 @@ import SwiftUI
     private let services: AppServices
 
     init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--test-model-navigation") {
+            services = ModelNavigationTestServices.make()
+            return
+        }
+        #endif
         let credentials = KeychainCredentialService(service: Bundle.main.bundleIdentifier ?? "Monekar")
         let connectionMetadata = UserDefaultsConnectionMetadataService()
         services = AppServices(

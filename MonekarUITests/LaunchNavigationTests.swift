@@ -2,6 +2,30 @@ import XCTest
 
 @MainActor
 final class LaunchNavigationTests: XCTestCase {
+    func testModelSelectionPushesAndNativeBackReturnsToTheGrid() {
+        let app = XCUIApplication()
+        app.launchArguments.append("--test-model-navigation")
+        app.launch()
+
+        let model = app.buttons["person-7"]
+        XCTAssertTrue(model.waitForExistence(timeout: 10))
+        model.tap()
+        XCTAssertTrue(app.segmentedControls["personSection"].waitForExistence(timeout: 5))
+
+        goBackFromPerson(in: app)
+        XCTAssertTrue(model.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.segmentedControls["personSection"].exists)
+
+        model.tap()
+        XCTAssertTrue(app.segmentedControls["personSection"].waitForExistence(timeout: 5))
+        openTab("Settings", in: app)
+        openTab("Models", in: app)
+        XCTAssertTrue(app.segmentedControls["personSection"].waitForExistence(timeout: 5))
+
+        goBackFromPerson(in: app)
+        XCTAssertTrue(model.waitForExistence(timeout: 5))
+    }
+
     func testLibraryScanIsReachable() {
         let app = XCUIApplication()
         app.launch()
@@ -72,5 +96,15 @@ final class LaunchNavigationTests: XCTestCase {
         let tab = app.buttons[title].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 5))
         tab.tap()
+    }
+
+    private func goBackFromPerson(in app: XCUIApplication) {
+        #if os(macOS)
+        let back = app.buttons["Back"].firstMatch
+        #else
+        let back = app.navigationBars["Person"].buttons.element(boundBy: 0)
+        #endif
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
     }
 }

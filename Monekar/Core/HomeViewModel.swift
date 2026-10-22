@@ -24,6 +24,11 @@ final class HomeViewModel {
         self.services = services
     }
 
+    func loadIfNeeded() async {
+        guard state == .idle else { return }
+        await load()
+    }
+
     func load() async {
         guard state != .loading else { return }
         let previousState = state

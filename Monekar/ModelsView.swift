@@ -18,6 +18,9 @@ struct ModelsView: View {
             }
             .navigationTitle("Models")
             .accessibilityIdentifier("homeScreen")
+            .navigationDestination(for: Int.self) { personID in
+                PersonDetailView(personID: personID, services: services, onOpenImage: onOpenImage)
+            }
         }
     }
 
@@ -29,9 +32,7 @@ struct ModelsView: View {
                     alignment: .leading, spacing: 20
                 ) {
                     ForEach(viewModel.people) { person in
-                        NavigationLink {
-                            PersonDetailView(personID: person.id, services: services, onOpenImage: onOpenImage)
-                        } label: {
+                        NavigationLink(value: person.id) {
                             ModelCard(person: person, services: services)
                         }
                         .buttonStyle(.plain)
