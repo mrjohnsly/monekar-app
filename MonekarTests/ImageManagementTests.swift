@@ -258,7 +258,10 @@ struct ImageManagementTests {
             defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
         )
         let services = AppServices(api: api, credentials: ImageManagementCredentials(), connectionMetadata: metadata)
-        let coordinator = AppCoordinator(services: services)
+        let favourites = services.imageLibrary.feed {
+            try await api.favourites(limit: $0, offset: $1)
+        }
+        let tags = PaginatedViewModel { try await api.tags(limit: $0, offset: $1) }
         api.respond = { request in
             let offset = request.queryItems.first { $0.name == "offset" }?.value ?? "0"
             let items = request.path == ["api", "v1", "tags"]
@@ -267,17 +270,18 @@ struct ImageManagementTests {
             return Data(#"{"items":"#.utf8) + items +
                 Data(#","total":51,"limit":50,"offset":\#(offset)}"#.utf8)
         }
-        await coordinator.favourites.loadIfNeeded()
-        await coordinator.favourites.loadMore()
-        #expect(coordinator.favourites.items.map(\.id) == [1, 2])
-        #expect(!coordinator.favourites.hasMore)
-        await coordinator.tags.loadIfNeeded()
-        await coordinator.tags.loadMore()
-        let gallery = coordinator.tagImages(id: 9)
+        await favourites.loadIfNeeded()
+        await favourites.loadMore()
+        #expect(favourites.items.map(\.id) == [1, 2])
+        #expect(!favourites.hasMore)
+        await tags.loadIfNeeded()
+        await tags.loadMore()
+        let gallery = services.imageLibrary.feed {
+            try await api.images(tagID: 9, limit: $0, offset: $1)
+        }
         await gallery.loadIfNeeded()
         await gallery.loadMore()
         #expect(gallery.items.map(\.id) == [1, 2])
-        #expect(coordinator.tagImages(id: 9) === gallery)
         #expect(api.requests.map(\.path) == [
             ["api", "v1", "favourites"], ["api", "v1", "favourites"],
             ["api", "v1", "tags"], ["api", "v1", "tags"],
@@ -285,22 +289,18 @@ struct ImageManagementTests {
         ])
         #expect(api.requests.map { $0.queryItems.last?.value } == ["0", "50", "0", "50", "0", "50"])
         api.respond = { _ in throw ConnectionFailure.unauthorized }
-        await coordinator.favourites.refresh()
+        await favourites.refresh()
         await gallery.refresh()
-        await coordinator.tags.refresh()
-        #expect(coordinator.favourites.hasError)
-        #expect(coordinator.favourites.items.count == 2)
+        await tags.refresh()
+        #expect(favourites.hasError)
+        #expect(favourites.items.count == 2)
         #expect(gallery.hasError)
         #expect(gallery.items.count == 2)
-        #expect(coordinator.tags.hasError)
-        let oldFavourites = coordinator.favourites
-        let oldTags = coordinator.tags
+        #expect(tags.hasError)
+        let originalRevision = services.connectionRevision
         api.configure(nil)
-        coordinator.connectionDidChange()
-        #expect(coordinator.favourites !== oldFavourites)
-        #expect(coordinator.tags !== oldTags)
-        #expect(coordinator.tagImages(id: 9) !== gallery)
-        #expect(coordinator.favourites.items.isEmpty)
+        services.connectionDidChange()
+        #expect(services.connectionRevision != originalRevision)
     }
 }
 

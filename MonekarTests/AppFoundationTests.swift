@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 #if SWIFT_PACKAGE
 @testable import MonekarCore
@@ -10,26 +11,28 @@ import Testing
 struct AppFoundationTests {
     private let serverURL = URL(string: "https://example.invalid")!
 
-    @Test func launchStartsAtRootAndNavigationReturnsHome() {
-        let coordinator = AppCoordinator(services: services())
-        #expect(coordinator.path.isEmpty)
-        #expect(coordinator.home.state == .idle)
-        coordinator.showConnection()
-        coordinator.showConnection()
-        #expect(coordinator.path == [.connection])
-        coordinator.pop()
-        coordinator.pop()
-        #expect(coordinator.path.isEmpty)
-        coordinator.showConnection()
-        coordinator.reset()
-        #expect(coordinator.path.isEmpty)
+    @Test func launchConnectionStateStartsIdle() {
+        let model = HomeViewModel(services: services())
+        #expect(model.state == .idle)
     }
 
-    @Test func windowsHaveIndependentNavigation() {
-        let first = AppCoordinator(services: services())
-        let second = AppCoordinator(services: services())
-        first.showConnection()
-        #expect(second.path.isEmpty)
+    @Test func connectionRevisionIsObservableAcrossSharedWindows() async {
+        let firstWindow = services()
+        let secondWindow = firstWindow
+        let separateApp = services()
+        let originalRevision = firstWindow.connectionRevision
+        let separateRevision = separateApp.connectionRevision
+        await confirmation("Shared windows invalidate browsing state") { changed in
+            withObservationTracking {
+                _ = secondWindow.connectionRevision
+            } onChange: {
+                changed()
+            }
+            firstWindow.connectionDidChange()
+        }
+        #expect(firstWindow.connectionRevision != originalRevision)
+        #expect(secondWindow.connectionRevision == firstWindow.connectionRevision)
+        #expect(separateApp.connectionRevision == separateRevision)
     }
 
     @Test func unconfiguredLaunchShowsEmptyState() async {
@@ -44,6 +47,54 @@ struct AppFoundationTests {
         await model.load()
         #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: true)))
     }
+
+    @Test func returningToBrowsingDoesNotReplaceTheLoadedConnectionGate() async {
+        let credentials = StubCredentials(password: "test-value")
+        let model = HomeViewModel(services: services(url: serverURL, credentials: credentials))
+        await model.loadIfNeeded()
+        let loadedState = model.state
+        credentials.onRead = {
+            Issue.record("Returning to the navigation root must not recheck credentials.")
+        }
+
+        await model.loadIfNeeded()
+
+        #expect(credentials.readCount == 1)
+        #expect(model.state == loadedState)
+    }
+
+    @Test func cancelledInitialConnectionGateCanLoadAgain() async {
+        let credentials = StubCredentials(password: "test-value")
+        let model = HomeViewModel(services: services(url: serverURL, credentials: credentials))
+        credentials.error = CancellationError()
+        await model.loadIfNeeded()
+        #expect(model.state == .idle)
+
+        credentials.error = nil
+        await model.loadIfNeeded()
+        #expect(model.state == .loaded(ConnectionSummary(serverURL: serverURL, hasCredential: true)))
+    }
+
+    #if DEBUG
+    @Test func modelNavigationFixtureLoadsWithoutARealServerOrCredentials() async throws {
+        let services = ModelNavigationTestServices.make()
+        let gate = HomeViewModel(services: services)
+        let models = ModelsViewModel(api: services.api)
+        await gate.loadIfNeeded()
+        await models.fetchPeople()
+        let person = try #require(models.people.first)
+        #expect(models.people.map(\.id) == [7])
+        #expect(models.people.first?.name == "Navigation model")
+        let detail = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
+        await detail.detail.loadIfNeeded()
+        await detail.albums.loadIfNeeded()
+        #expect(detail.detail.state == .loaded(person))
+        #expect(detail.albums.state == .empty)
+        #expect(gate.state == .loaded(ConnectionSummary(
+            serverURL: services.api.baseURL!, hasCredential: true
+        )))
+    }
+    #endif
 
     @Test(arguments: [nil, ""])
     func missingCredentialRequiresSignIn(password: String?) async {
