@@ -190,6 +190,23 @@ struct APIClientTests {
         #expect(transport.requests[3].httpBody == nil)
     }
 
+    @Test(arguments: [400, 401, 404, 422])
+    func favouriteAndTagRequestsPropagateServerFailures(status: Int) async throws {
+        let (api, transport) = try client()
+        transport.statusCode = status
+        let failure: ConnectionFailure = status == 401 ? .unauthorized : .serverRejected(status)
+        await #expect(throws: failure) { try await api.favourites(limit: 25, offset: 50) }
+        await #expect(throws: failure) { try await api.tags(limit: 25, offset: 50) }
+        await #expect(throws: failure) { try await api.images(tagID: 10, limit: 25, offset: 50) }
+        await #expect(throws: failure) { try await api.setFavourite(imageID: 9, isFavourite: true) }
+        await #expect(throws: failure) { try await api.setFavourite(imageID: 9, isFavourite: false) }
+        await #expect(throws: failure) { try await api.tags(imageID: 9) }
+        await #expect(throws: failure) { try await api.addTag(imageID: 9, name: "Rejected name") }
+        await #expect(throws: failure) { try await api.removeTag(imageID: 9, tagID: 10) }
+        #expect(transport.requests.count == 8)
+        #expect(transport.requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") != nil })
+    }
+
     @Test func paginationUsesReturnedLimitAndStopsAtTotal() async throws {
         let (api, transport) = try client()
         transport.respond = { request in

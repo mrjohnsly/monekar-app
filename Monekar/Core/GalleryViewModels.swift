@@ -33,6 +33,14 @@ final class PaginatedViewModel<Item: Decodable & Identifiable & Equatable & Send
         await load(replacing: true)
     }
 
+    func refreshWhenReady() async {
+        while isLoading {
+            await withCheckedContinuation { loadWaiters.append($0) }
+        }
+        guard !Task.isCancelled else { return }
+        await refresh()
+    }
+
     func loadMore() async {
         guard hasMore else { return }
         await load(replacing: false)
@@ -162,10 +170,12 @@ final class PersonViewModel {
     let images: PaginatedViewModel<MonekarAPI.Image>
     var selection: PersonSection = .albums
 
-    init(id: Int, api: any APIService) {
+    init(id: Int, api: any APIService, imageLibrary: ImageLibrary? = nil) {
         detail = DetailViewModel { try await api.person(id: id) }
         albums = PaginatedViewModel { try await api.albums(personID: id, limit: $0, offset: $1) }
-        images = PaginatedViewModel { try await api.images(personID: id, limit: $0, offset: $1) }
+        images = (imageLibrary ?? ImageLibrary(api: api)).feed {
+            try await api.images(personID: id, limit: $0, offset: $1)
+        }
     }
 }
 
@@ -175,8 +185,10 @@ final class AlbumViewModel {
     let detail: DetailViewModel<MonekarAPI.Album>
     let images: PaginatedViewModel<MonekarAPI.Image>
 
-    init(id: Int, api: any APIService) {
+    init(id: Int, api: any APIService, imageLibrary: ImageLibrary? = nil) {
         detail = DetailViewModel { try await api.album(id: id) }
-        images = PaginatedViewModel { try await api.images(albumID: id, limit: $0, offset: $1) }
+        images = (imageLibrary ?? ImageLibrary(api: api)).feed {
+            try await api.images(albumID: id, limit: $0, offset: $1)
+        }
     }
 }
