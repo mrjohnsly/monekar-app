@@ -36,6 +36,7 @@
         "resources",
       ],
       "build-settings": {
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": "Monekar/Monekar.entitlements",
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
         "ENABLE_APP_SANDBOX": "YES",
