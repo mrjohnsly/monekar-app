@@ -13,7 +13,7 @@ struct ModelsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 250), spacing: 4)], spacing: 4) {
                     ForEach(viewModel.models) { model in
                         NavigationLink(value: model) {
                             ModelThumbnail(model: model)
@@ -39,8 +39,4 @@ struct ModelsView: View {
             }
         }
     }
-}
-
-#Preview {
-    ModelsView()
 }
