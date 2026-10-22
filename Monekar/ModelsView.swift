@@ -10,49 +10,6 @@ struct ModelsView: View {
     }
 
     var body: some View {
-        Group {
-            switch coordinator.home.state {
-            case .idle, .loading:
-                ProgressView("Loading connection…")
-            case .empty:
-                ContentUnavailableView(
-                    "No server configured",
-                    systemImage: "network",
-                    description: Text("Open Settings to set up a server connection.")
-                )
-            case .loaded(let summary):
-                if summary.hasCredential {
-                    models
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "server.rack")
-                            .font(.largeTitle)
-                        Text("Sign-in required")
-                            .font(.title)
-                        Text(summary.serverURL.host() ?? "monekar-server")
-                        Text("Open Settings, then Connection to sign in again.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            case .failed:
-                ContentUnavailableView {
-                    Label("Unable to load connection", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text("Check your configuration and try again.")
-                } actions: {
-                    Button("Retry") {
-                        Task { await coordinator.home.load() }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("Models")
-        .accessibilityIdentifier("homeScreen")
-        .task { await coordinator.home.load() }
-    }
-
-    private var models: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 LazyVGrid(
@@ -78,6 +35,7 @@ struct ModelsView: View {
             }
             .padding()
         }
+        .navigationTitle("Models")
         .task { await viewModel.fetchPeople() }
         .refreshable { await viewModel.refresh() }
         .toolbar {
