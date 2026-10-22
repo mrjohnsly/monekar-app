@@ -13,6 +13,10 @@ struct ContentView: View {
             HomeView(coordinator: coordinator)
                 .navigationTitle("Monekar")
                 .toolbar {
+                    NavigationLink(value: AppRoute.libraryScan) {
+                        Label("Library Scan", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .accessibilityIdentifier("showLibraryScan")
                     Button("Connection", systemImage: "network") {
                         coordinator.showConnection()
                     }
@@ -20,6 +24,8 @@ struct ContentView: View {
                 }
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
+                    case .libraryScan:
+                        LibraryScanView(viewModel: coordinator.services.libraryScan)
                     case .person(let id):
                         PersonDetailView(
                             viewModel: coordinator.person(id: id),

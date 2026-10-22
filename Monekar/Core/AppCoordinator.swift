@@ -3,6 +3,7 @@ import Observation
 
 enum AppRoute: Hashable {
     case connection
+    case libraryScan
     case person(Int)
     case album(Int)
     case favourites
@@ -81,6 +82,7 @@ final class AppCoordinator {
         configuration = current
         sessionID = services.api.mediaSessionID
         services.imageLibrary.synchronizeConnection()
+        services.libraryScan.synchronizeConnection()
         people = PaginatedViewModel { [services] in
             try await services.api.people(limit: $0, offset: $1)
         }
