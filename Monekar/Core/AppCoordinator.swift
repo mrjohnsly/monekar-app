@@ -17,7 +17,7 @@ final class AppCoordinator {
     var path: [AppRoute] = []
     let home: HomeViewModel
     let services: AppServices
-    private(set) var people: PaginatedViewModel<MonekarAPI.Person>
+    private(set) var people: ModelsViewModel
     private(set) var favourites: PaginatedViewModel<MonekarAPI.Image>
     private(set) var tags: PaginatedViewModel<MonekarAPI.Tag>
     private var tagGalleries: [Int: PaginatedViewModel<MonekarAPI.Image>] = [:]
@@ -29,7 +29,7 @@ final class AppCoordinator {
     init(services: AppServices) {
         self.services = services
         home = HomeViewModel(services: services)
-        people = PaginatedViewModel { try await services.api.people(limit: $0, offset: $1) }
+        people = ModelsViewModel(api: services.api)
         favourites = services.imageLibrary.feed { try await services.api.favourites(limit: $0, offset: $1) }
         tags = PaginatedViewModel { try await services.api.tags(limit: $0, offset: $1) }
         configuration = services.connectionMetadata.configuration
@@ -83,9 +83,7 @@ final class AppCoordinator {
         sessionID = services.api.mediaSessionID
         services.imageLibrary.synchronizeConnection()
         services.libraryScan.synchronizeConnection()
-        people = PaginatedViewModel { [services] in
-            try await services.api.people(limit: $0, offset: $1)
-        }
+        people = ModelsViewModel(api: services.api)
         peopleDetails.removeAll()
         albumDetails.removeAll()
         favourites = services.imageLibrary.feed { [services] in

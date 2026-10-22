@@ -2,71 +2,6 @@ import SwiftUI
 
 private let galleryColumns = [GridItem(.adaptive(minimum: 160, maximum: 240), spacing: 16)]
 
-struct PeopleView: View {
-    let coordinator: AppCoordinator
-
-    private var viewModel: PaginatedViewModel<MonekarAPI.Person> { coordinator.people }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("People")
-                    .font(.largeTitle.bold())
-                LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 20) {
-                    ForEach(viewModel.items) { person in
-                        VStack(alignment: .leading, spacing: 6) {
-                            GalleryThumbnail(
-                                reference: person.thumbnailURL,
-                                services: coordinator.services,
-                                label: person.name,
-                                open: { coordinator.showPerson(id: person.id) }
-                            )
-                            Button {
-                                coordinator.showPerson(id: person.id)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(person.name)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Text("\(person.albumCount) albums · \(person.imageCount) images")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("person-\(person.id)")
-                        }
-                    }
-                }
-                if viewModel.items.isEmpty && viewModel.state == .empty {
-                    GalleryEmptyView(title: "No people", description: "No people are available on this server.")
-                }
-                GalleryFooter(
-                    count: viewModel.items.count, total: viewModel.total,
-                    isLoading: viewModel.isLoading || viewModel.state == .idle,
-                    hasError: viewModel.hasError, hasMore: viewModel.hasMore,
-                    retry: { await viewModel.retry() },
-                    loadMore: { await viewModel.loadMore() }
-                )
-            }
-            .padding()
-        }
-        .task { await viewModel.loadIfNeeded() }
-        .refreshable { await viewModel.refresh() }
-        .toolbar {
-            NavigationLink("Favourites", value: AppRoute.favourites)
-            NavigationLink("Tags", value: AppRoute.tags)
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                Task { await viewModel.refresh() }
-            }
-            .disabled(viewModel.isLoading)
-            .accessibilityIdentifier("refreshPeople")
-        }
-    }
-}
-
 struct ImageFeedView: View {
     let title: String
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
@@ -375,7 +310,7 @@ private struct ImageGrid: View {
     }
 }
 
-private struct GalleryFooter: View {
+struct GalleryFooter: View {
     let count: Int
     let total: Int
     let isLoading: Bool
@@ -424,7 +359,7 @@ private struct GalleryRetryView: View {
     }
 }
 
-private struct GalleryEmptyView: View {
+struct GalleryEmptyView: View {
     let title: String
     let description: String
 
@@ -434,7 +369,7 @@ private struct GalleryEmptyView: View {
     }
 }
 
-private struct GalleryThumbnail: View {
+struct GalleryThumbnail: View {
     let reference: String
     let services: AppServices
     let label: String

@@ -1,28 +1,97 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var coordinator: AppCoordinator
+    let services: AppServices
     @State private var imageViewerSelection: ImageViewerSelection?
 
-    init(services: AppServices) {
+    var body: some View {
+        TabView {
+            Tab {
+                AppNavigationView(services: services, onOpenImage: openImage) { coordinator in
+                    ModelsView(coordinator: coordinator)
+                        .id(ObjectIdentifier(coordinator.people))
+                }
+            } label: {
+                Label("Models", systemImage: "person")
+            }
+
+            Tab {
+                AppNavigationView(services: services, onOpenImage: openImage) { coordinator in
+                    ImageFeedView(
+                        title: "Favourites", viewModel: coordinator.favourites,
+                        services: services, onOpenImage: openImage
+                    )
+                    .id(ObjectIdentifier(coordinator.favourites))
+                }
+            } label: {
+                Label("Favourites", systemImage: "heart")
+            }
+
+            Tab {
+                AppNavigationView(services: services, onOpenImage: openImage) { coordinator in
+                    TagsView(coordinator: coordinator)
+                        .id(ObjectIdentifier(coordinator.tags))
+                }
+            } label: {
+                Label("Tags", systemImage: "tag")
+            }
+
+            Tab {
+                AppNavigationView(services: services, onOpenImage: openImage) { coordinator in
+                    List {
+                        Button("Connection", systemImage: "network") {
+                            coordinator.showConnection()
+                        }
+                        .accessibilityIdentifier("showConnection")
+                        NavigationLink(value: AppRoute.libraryScan) {
+                            Label("Library Scan", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .accessibilityIdentifier("showLibraryScan")
+                    }
+                    .navigationTitle("Settings")
+                }
+            } label: {
+                Label("Settings", systemImage: "gear")
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .toolbar(imageViewerSelection == nil ? .automatic : .hidden)
+        .overlay {
+            if let selection = imageViewerSelection {
+                ImageViewer(selection: selection, services: services) {
+                    imageViewerSelection = nil
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black)
+                .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func openImage(_ selection: ImageViewerSelection) {
+        imageViewerSelection = selection
+    }
+}
+
+private struct AppNavigationView<Content: View>: View {
+    @State private var coordinator: AppCoordinator
+    let onOpenImage: (ImageViewerSelection) -> Void
+    let content: (AppCoordinator) -> Content
+
+    init(
+        services: AppServices,
+        onOpenImage: @escaping (ImageViewerSelection) -> Void,
+        @ViewBuilder content: @escaping (AppCoordinator) -> Content
+    ) {
         _coordinator = State(initialValue: AppCoordinator(services: services))
+        self.onOpenImage = onOpenImage
+        self.content = content
     }
 
     var body: some View {
         @Bindable var coordinator = coordinator
         NavigationStack(path: $coordinator.path) {
-            HomeView(coordinator: coordinator)
-                .navigationTitle("Monekar")
-                .toolbar {
-                    NavigationLink(value: AppRoute.libraryScan) {
-                        Label("Library Scan", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .accessibilityIdentifier("showLibraryScan")
-                    Button("Connection", systemImage: "network") {
-                        coordinator.showConnection()
-                    }
-                    .accessibilityIdentifier("showConnection")
-                }
+            content(coordinator)
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
                     case .libraryScan:
@@ -31,19 +100,19 @@ struct ContentView: View {
                         PersonDetailView(
                             viewModel: coordinator.person(id: id),
                             coordinator: coordinator,
-                            onOpenImage: { imageViewerSelection = $0 }
+                            onOpenImage: onOpenImage
                         )
                     case .album(let id):
                         AlbumDetailView(
                             viewModel: coordinator.album(id: id),
                             services: coordinator.services,
-                            onOpenImage: { imageViewerSelection = $0 }
+                            onOpenImage: onOpenImage
                         )
                     case .favourites:
                         ImageFeedView(
                             title: "Favourites", viewModel: coordinator.favourites,
                             services: coordinator.services,
-                            onOpenImage: { imageViewerSelection = $0 }
+                            onOpenImage: onOpenImage
                         )
                     case .tags:
                         TagsView(coordinator: coordinator)
@@ -51,7 +120,7 @@ struct ContentView: View {
                         ImageFeedView(
                             title: tag.name, viewModel: coordinator.tagImages(id: tag.id),
                             services: coordinator.services,
-                            onOpenImage: { imageViewerSelection = $0 }
+                            onOpenImage: onOpenImage
                         )
                     case .connection:
                         ConnectionView(
@@ -71,65 +140,6 @@ struct ContentView: View {
                     }
                 }
         }
-        .toolbar(imageViewerSelection == nil ? .automatic : .hidden)
-        .overlay {
-            if let selection = imageViewerSelection {
-                ImageViewer(selection: selection, services: coordinator.services) {
-                    imageViewerSelection = nil
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black)
-                .ignoresSafeArea()
-            }
-        }
-    }
-}
-
-private struct HomeView: View {
-    let coordinator: AppCoordinator
-
-    private var viewModel: HomeViewModel { coordinator.home }
-
-    var body: some View {
-        Group {
-            switch viewModel.state {
-            case .idle, .loading:
-                ProgressView("Loading connection…")
-            case .empty:
-                ContentUnavailableView(
-                    "No server configured",
-                    systemImage: "network",
-                    description: Text("Set up a local-network or Tailscale server connection to get started.")
-                )
-            case .loaded(let summary):
-                if summary.hasCredential {
-                    PeopleView(coordinator: coordinator)
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "server.rack")
-                            .font(.largeTitle)
-                        Text("Sign-in required")
-                            .font(.title)
-                        Text(summary.serverURL.host() ?? "monekar-server")
-                        Text("Open Connection to sign in again.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            case .failed:
-                ContentUnavailableView {
-                    Label("Unable to load connection", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text("Check your configuration and try again.")
-                } actions: {
-                    Button("Retry") {
-                        Task { await viewModel.load() }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("homeScreen")
-        .task { await viewModel.load() }
     }
 }
 

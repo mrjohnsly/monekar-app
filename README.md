@@ -20,6 +20,8 @@ To verify on macOS, save a connection, quit the app, change a source file, and r
 
 `Monekar/Core` contains the API contract, transport, connection and credential abstractions, observable view models, and app coordinator. It is built directly by SwiftPM so this logic can be tested without SwiftUI or a server. SwiftUI screens live under `Monekar/` and use the coordinator and view models rather than making network requests directly. `AppServices` supplies shared API, Keychain credential, media, image-library, and scan services.
 
+`ContentView` declares the Models, Favourites, Tags, and Settings tabs using a sidebar-adaptable tab view. Each tab has its own navigation stack. `ModelsView` holds an observable `ModelsViewModel` in SwiftUI state; the model uses the shared API service and pagination logic to fetch people. Connection setup and library scanning are available under Settings. The other gallery screens retain their existing coordinator-based implementation.
+
 ## Connecting to a local server
 
 Enter the server installation root as the base URL, including any reverse-proxy prefix, but not `/api/v1` (for example, `https://monekar.local:8443/photos`). The app checks the public `/health` route and sends Basic authentication to protected API and same-origin media routes.

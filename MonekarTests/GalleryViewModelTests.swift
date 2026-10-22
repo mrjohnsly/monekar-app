@@ -302,8 +302,8 @@ struct GalleryViewModelTests {
     @Test func coordinatorPreservesScreenModelsAndSelectionsAcrossNavigation() async {
         let (services, _) = galleryServices()
         let coordinator = AppCoordinator(services: services)
-        await coordinator.people.loadIfNeeded()
-        #expect(coordinator.people.items == [person(7)])
+        await coordinator.people.fetchPeople()
+        #expect(coordinator.people.people == [person(7)])
         coordinator.showPerson(id: 7)
         coordinator.showPerson(id: 7)
         let personModel = coordinator.person(id: 7)
@@ -326,7 +326,7 @@ struct GalleryViewModelTests {
         #expect(coordinator.album(id: 9) === albumModel)
         coordinator.reset()
         #expect(coordinator.path.isEmpty)
-        #expect(coordinator.people.items == [person(7)])
+        #expect(coordinator.people.people == [person(7)])
     }
 
     @Test func windowsHaveIndependentGalleryState() {
@@ -368,7 +368,7 @@ struct GalleryViewModelTests {
         let (services, metadata) = galleryServices()
         let first = AppCoordinator(services: services)
         let second = AppCoordinator(services: services)
-        await second.people.loadIfNeeded()
+        await second.people.fetchPeople()
         let oldPeople = second.people
         let oldPerson = second.person(id: 7)
         second.showPerson(id: 7)
