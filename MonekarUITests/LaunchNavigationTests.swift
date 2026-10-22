@@ -99,11 +99,8 @@ final class LaunchNavigationTests: XCTestCase {
     }
 
     private func goBackFromPerson(in app: XCUIApplication) {
-        #if os(macOS)
-        let back = app.buttons["Back"].firstMatch
-        #else
-        let back = app.navigationBars["Person"].buttons.element(boundBy: 0)
-        #endif
+        let navigationBack = app.navigationBars["Person"].buttons.element(boundBy: 0)
+        let back = navigationBack.exists ? navigationBack : app.buttons["Back"].firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         back.tap()
     }
