@@ -27,7 +27,7 @@ enum SidebarTabs: String, Identifiable, CaseIterable {
     var content: some View {
         switch self {
         case .models: ModelsView()
-        case .favourites: Text("Favourites")
+        case .favourites: FavouritesView()
         case .settings: Text("Settings")
         }
     }
