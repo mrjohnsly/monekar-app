@@ -126,6 +126,23 @@ struct ServerConnectionTests {
         }
     }
 
+    @Test func connectionVerificationSurfacesTLSFailuresWithoutSendingCredentials() async throws {
+        let transport = StubTransport(error: URLError(.serverCertificateUntrusted))
+        let api = makeAPI(
+            transport: transport,
+            configuration: try ServerConnection(serverURL: "https://server.local", username: "alice")
+        )
+
+        do {
+            try await api.verifyConnection(api.configuration)
+            Issue.record("Expected a certificate trust failure")
+        } catch let failure as ConnectionFailure {
+            #expect(failure == .certificateTrust)
+        }
+        #expect(transport.request?.url?.path == "/health")
+        #expect(transport.request?.value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
     @Test func mediaOnAnotherOriginDoesNotReceiveCredentials() async throws {
         let transport = StubTransport()
         let api = makeAPI(transport: transport)

@@ -165,6 +165,32 @@ struct APIClientTests {
         #expect(transport.requests[2].url?.query == nil)
     }
 
+    @Test func everyPaginatedEndpointUsesTheRequestedLimitAndOffset() async throws {
+        let (api, transport) = try client()
+        let endpoints: [(String, String, (Int, Int) async throws -> Void)] = [
+            ("people", Self.personJSON, { limit, offset in _ = try await api.people(limit: limit, offset: offset) }),
+            ("people/7/albums", Self.albumJSON, { limit, offset in _ = try await api.albums(personID: 7, limit: limit, offset: offset) }),
+            ("people/7/images", Self.imageJSON, { limit, offset in _ = try await api.images(personID: 7, limit: limit, offset: offset) }),
+            ("albums/8/images", Self.imageJSON, { limit, offset in _ = try await api.images(albumID: 8, limit: limit, offset: offset) }),
+            ("favourites", Self.imageJSON, { limit, offset in _ = try await api.favourites(limit: limit, offset: offset) }),
+            ("tags", Self.tagJSON, { limit, offset in _ = try await api.tags(limit: limit, offset: offset) }),
+            ("tags/10/images", Self.imageJSON, { limit, offset in _ = try await api.images(tagID: 10, limit: limit, offset: offset) }),
+        ]
+
+        for (path, item, fetch) in endpoints {
+            transport.json = Self.page(item)
+            try await fetch(25, 50)
+
+            let request = try #require(transport.requests.last)
+            #expect(request.url?.path == "/api/v1/\(path)")
+            #expect(request.httpMethod == "GET")
+            #expect(URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: true)?.queryItems == [
+                URLQueryItem(name: "limit", value: "25"),
+                URLQueryItem(name: "offset", value: "50"),
+            ])
+        }
+    }
+
     @Test func mutationsUseCorrectVerbsAndJSONBody() async throws {
         let (api, transport) = try client()
         transport.json = Self.imageJSON
