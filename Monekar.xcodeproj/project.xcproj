@@ -19,8 +19,8 @@
       "name": "Products",
       "children": [
         { "path": "<PRODUCTS>/Monekar.app", "id": "000000000000000000000120", "type": "wrapper.application", "index": false },
-        { "path": "<PRODUCTS>/MonekarTests.xctest", "type": "wrapper.cfbundle", "index": false },
-        { "path": "<PRODUCTS>/MonekarUITests.xctest", "type": "wrapper.cfbundle", "index": false },
+        { "path": "<PRODUCTS>/MonekarTests.xctest", "id": "7F66A8C0079B41F239C505FA", "type": "wrapper.cfbundle", "index": false },
+        { "path": "<PRODUCTS>/MonekarUITests.xctest", "id": "5B062918B2FD7CE130ACC80A", "type": "wrapper.cfbundle", "index": false },
       ],
     },
   ],
@@ -38,6 +38,7 @@
       "build-settings": {
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
+        "DEVELOPMENT_TEAM": "T4LWWUQLWQ",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
         "ENABLE_PREVIEWS": "YES",
@@ -58,7 +59,7 @@
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
         "MARKETING_VERSION": "1.0",
-        "PRODUCT_BUNDLE_IDENTIFIER": "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.sly.Monekar",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "REGISTER_APP_GROUPS": "YES",
         "SDKROOT": "auto",
@@ -72,18 +73,22 @@
         "SWIFT_VERSION": "6.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
       },
-    },
-    {
+    }, {
       "name": "MonekarTests",
       "id": "000000000000000100000001",
       "product": "Products/MonekarTests.xctest",
       "product-type": "bundle.unit-test",
       "test-host-target": "Monekar",
-      "dependencies": [ "Monekar" ],
-      "build-phases": [ "compile-sources", "frameworks", "resources" ],
+      "dependencies": [
+        "Monekar",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
       "build-settings": {
         "BUNDLE_LOADER": "$(TEST_HOST)",
-        "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/Monekar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Monekar",
         "CODE_SIGN_STYLE": "Automatic",
         "GENERATE_INFOPLIST_FILE": "YES",
         "PRODUCT_BUNDLE_IDENTIFIER": "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).MonekarTests",
@@ -93,16 +98,22 @@
         "SUPPORTS_MACCATALYST": "NO",
         "SWIFT_VERSION": "6.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
+        "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/Monekar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Monekar",
       },
-    },
-    {
+    }, {
       "name": "MonekarUITests",
       "id": "000000000000000100000002",
       "product": "Products/MonekarUITests.xctest",
       "product-type": "bundle.ui-testing",
       "test-host-target": "Monekar",
-      "dependencies": [ "Monekar" ],
-      "build-phases": [ "compile-sources", "frameworks", "resources" ],
+      "dependencies": [
+        "Monekar",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
       "build-settings": {
         "CODE_SIGN_STYLE": "Automatic",
         "GENERATE_INFOPLIST_FILE": "YES",
