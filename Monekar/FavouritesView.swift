@@ -1,25 +1,15 @@
 import SwiftUI
 
 struct FavouritesView: View {
-    @State private var viewModel: PaginatedViewModel<MonekarAPI.Image>
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    @Environment(WindowModels.self) private var models
 
-    init(services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: services.imageLibrary.feed {
-            try await services.api.favourites(limit: $0, offset: $1)
-        })
-    }
+    private var viewModel: PaginatedViewModel<MonekarAPI.Image> { models.browsing.favourites }
+    private var connectionViewModel: HomeViewModel { models.browsing.favouritesConnection }
 
     var body: some View {
         NavigationStack {
-            ConnectedContentView(services: services) {
-                ImageFeedView(
-                    title: "Favourites", viewModel: viewModel,
-                    services: services, onOpenImage: onOpenImage
-                )
+            ConnectedContentView(viewModel: connectionViewModel) {
+                ImageFeedView(title: "Favourites", viewModel: viewModel)
             }
             .navigationTitle("Favourites")
         }

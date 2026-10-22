@@ -1,4 +1,5 @@
 import SwiftUI
+import Observation
 
 struct AuthenticatedImageView: View {
     let reference: String
@@ -81,29 +82,38 @@ struct AuthenticatedImageView: View {
 }
 
 struct ImageViewerSelection: Identifiable {
+    let id = UUID()
     let images: [MonekarAPI.Image]
     let selectedImageID: Int
 
-    var id: Int { selectedImageID }
+    var initialIndex: Int {
+        images.firstIndex { $0.id == selectedImageID } ?? 0
+    }
+}
+
+@MainActor
+@Observable
+final class ImagePresentation {
+    private(set) var selection: ImageViewerSelection?
+
+    func open(_ selection: ImageViewerSelection) {
+        guard !selection.images.isEmpty else { return }
+        self.selection = selection
+    }
+
+    func dismiss() {
+        selection = nil
+    }
 }
 
 struct ImageViewer: View {
     let selection: ImageViewerSelection
-    let services: AppServices
-    let onDismiss: () -> Void
+    @State var selectedIndex: Int
+    @Environment(AppServices.self) private var services
+    @Environment(ImagePresentation.self) private var presentation
     @State private var zoom: CGFloat = 1
     @GestureState private var magnification: CGFloat = 1
-    @State private var selectedIndex: Int
     @FocusState private var isFocused: Bool
-
-    init(selection: ImageViewerSelection, services: AppServices, onDismiss: @escaping () -> Void) {
-        self.selection = selection
-        self.services = services
-        self.onDismiss = onDismiss
-        _selectedIndex = State(
-            initialValue: selection.images.firstIndex { $0.id == selection.selectedImageID } ?? 0
-        )
-    }
 
     private var image: MonekarAPI.Image { selection.images[selectedIndex] }
 
@@ -153,7 +163,7 @@ struct ImageViewer: View {
             .navigationTitle(image.fileName)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Close", systemImage: "xmark", action: onDismiss)
+                    Button("Close", systemImage: "xmark", action: presentation.dismiss)
                         .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("closeImageViewer")
                 }
@@ -168,7 +178,7 @@ struct ImageViewer: View {
         }
         .preferredColorScheme(.dark)
         .accessibilityIdentifier("imageViewer")
-        .onChange(of: services.api.mediaSessionID) { _, _ in onDismiss() }
+        .onChange(of: services.api.mediaSessionID) { _, _ in presentation.dismiss() }
         .focusable()
         .focused($isFocused)
         .onAppear { isFocused = true }

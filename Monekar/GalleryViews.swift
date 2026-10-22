@@ -5,12 +5,11 @@ private let galleryColumns = [GridItem(.adaptive(minimum: 160, maximum: 240), sp
 struct ImageFeedView: View {
     let title: String
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    @Environment(AppServices.self) private var services
 
     var body: some View {
         ScrollView {
-            ImageGrid(viewModel: viewModel, services: services, onOpenImage: onOpenImage)
+            ImageGrid(viewModel: viewModel)
                 .padding()
         }
         .navigationTitle(title)
@@ -26,17 +25,10 @@ struct ImageFeedView: View {
 }
 
 struct PersonDetailView: View {
-    @State private var viewModel: PersonViewModel
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    let personID: Int
+    @Environment(WindowModels.self) private var models
 
-    init(personID: Int, services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: PersonViewModel(
-            id: personID, api: services.api, imageLibrary: services.imageLibrary
-        ))
-    }
+    private var viewModel: PersonViewModel { models.browsing.person(id: personID) }
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -72,12 +64,9 @@ struct PersonDetailView: View {
 
                 switch viewModel.selection {
                 case .albums:
-                    AlbumGrid(viewModel: viewModel.albums, services: services, onOpenImage: onOpenImage)
+                    AlbumGrid(viewModel: viewModel.albums)
                 case .images:
-                    ImageGrid(
-                        viewModel: viewModel.images, services: services,
-                        onOpenImage: onOpenImage
-                    )
+                    ImageGrid(viewModel: viewModel.images)
                 }
             }
             .padding()
@@ -121,17 +110,10 @@ struct PersonDetailView: View {
 }
 
 struct AlbumDetailView: View {
-    @State private var viewModel: AlbumViewModel
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    let albumID: Int
+    @Environment(WindowModels.self) private var models
 
-    init(albumID: Int, services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: AlbumViewModel(
-            id: albumID, api: services.api, imageLibrary: services.imageLibrary
-        ))
-    }
+    private var viewModel: AlbumViewModel { models.browsing.album(id: albumID) }
 
     var body: some View {
         ScrollView {
@@ -165,7 +147,7 @@ struct AlbumDetailView: View {
                         await viewModel.detail.refresh()
                     }
                 }
-                ImageGrid(viewModel: viewModel.images, services: services, onOpenImage: onOpenImage)
+                ImageGrid(viewModel: viewModel.images)
             }
             .padding()
         }
@@ -196,20 +178,17 @@ struct AlbumDetailView: View {
 
 private struct AlbumGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Album>
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
 
     var body: some View {
         VStack(spacing: 16) {
             LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 20) {
                 ForEach(viewModel.items) { album in
                     NavigationLink {
-                        AlbumDetailView(albumID: album.id, services: services, onOpenImage: onOpenImage)
+                        AlbumDetailView(albumID: album.id)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             GalleryThumbnail(
                                 reference: album.thumbnailURL,
-                                services: services,
                                 label: album.name
                             )
                             VStack(alignment: .leading, spacing: 6) {
@@ -243,12 +222,12 @@ private struct AlbumGrid: View {
 
 private struct ImageGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    @Environment(AppServices.self) private var services
+    @Environment(ImagePresentation.self) private var presentation
 
     private func open(_ image: MonekarAPI.Image) {
         let images = viewModel.items.map { services.imageLibrary.model(for: $0).image }
-        onOpenImage(ImageViewerSelection(images: images, selectedImageID: image.id))
+        presentation.open(ImageViewerSelection(images: images, selectedImageID: image.id))
     }
 
     var body: some View {
@@ -259,7 +238,7 @@ private struct ImageGrid: View {
                     let image = model.image
                     VStack(alignment: .leading, spacing: 6) {
                         GalleryThumbnail(
-                            reference: image.thumbnailURL, services: services, label: image.fileName,
+                            reference: image.thumbnailURL, label: image.fileName,
                             open: { open(image) }
                         )
                         Button(image.fileName) { open(image) }
@@ -354,7 +333,7 @@ struct GalleryEmptyView: View {
 
 struct GalleryThumbnail: View {
     let reference: String
-    let services: AppServices
+    @Environment(AppServices.self) private var services
     let label: String
     var open: (() -> Void)?
     @Environment(\.displayScale) private var displayScale

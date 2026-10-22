@@ -24,7 +24,8 @@ import SwiftUI
 
     var body: some Scene {
         WindowGroup {
-            ContentView(services: services)
+            ContentView(models: WindowModels(services: services), presentation: ImagePresentation())
+                .environment(services)
         }
     }
 }

@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct LibraryScanView: View {
-    let viewModel: LibraryScanViewModel
+    @Environment(AppServices.self) private var services
+    private var viewModel: LibraryScanViewModel { services.libraryScan }
     @Environment(\.scenePhase) private var scenePhase
     @State private var observer = UUID()
     @State private var isVisible = false

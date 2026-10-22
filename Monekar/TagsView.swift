@@ -1,21 +1,15 @@
 import SwiftUI
 
 struct TagsView: View {
-    @State private var viewModel: PaginatedViewModel<MonekarAPI.Tag>
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    @Environment(WindowModels.self) private var models
+    @Environment(AppServices.self) private var services
 
-    init(services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: PaginatedViewModel {
-            try await services.api.tags(limit: $0, offset: $1)
-        })
-    }
+    private var viewModel: PaginatedViewModel<MonekarAPI.Tag> { models.browsing.tags }
+    private var connectionViewModel: HomeViewModel { models.browsing.tagsConnection }
 
     var body: some View {
         NavigationStack {
-            ConnectedContentView(services: services) {
+            ConnectedContentView(viewModel: connectionViewModel) {
                 tags
             }
             .navigationTitle("Tags")
@@ -26,7 +20,7 @@ struct TagsView: View {
         List {
             ForEach(viewModel.items) { tag in
                 NavigationLink {
-                    TagImagesView(tag: tag, services: services, onOpenImage: onOpenImage)
+                    TagImagesView(tag: tag)
                 } label: {
                     Text(tag.name)
                 }
@@ -54,21 +48,10 @@ struct TagsView: View {
 }
 
 private struct TagImagesView: View {
-    @State private var viewModel: PaginatedViewModel<MonekarAPI.Image>
     let tag: MonekarAPI.Tag
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
-
-    init(tag: MonekarAPI.Tag, services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.tag = tag
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: services.imageLibrary.feed {
-            try await services.api.images(tagID: tag.id, limit: $0, offset: $1)
-        })
-    }
+    @Environment(WindowModels.self) private var models
 
     var body: some View {
-        ImageFeedView(title: tag.name, viewModel: viewModel, services: services, onOpenImage: onOpenImage)
+        ImageFeedView(title: tag.name, viewModel: models.browsing.images(tagID: tag.id))
     }
 }

@@ -1,17 +1,10 @@
 import SwiftUI
 
 struct ModelsView: View {
-    @State private var viewModel: ModelsViewModel
-    @State private var connectionViewModel: HomeViewModel
-    let services: AppServices
-    let onOpenImage: (ImageViewerSelection) -> Void
+    @Environment(WindowModels.self) private var windowModels
 
-    init(services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
-        self.services = services
-        self.onOpenImage = onOpenImage
-        _viewModel = State(initialValue: ModelsViewModel(api: services.api))
-        _connectionViewModel = State(initialValue: HomeViewModel(services: services))
-    }
+    private var viewModel: ModelsViewModel { windowModels.browsing.models }
+    private var connectionViewModel: HomeViewModel { windowModels.browsing.modelsConnection }
 
     var body: some View {
         NavigationStack {
@@ -56,7 +49,7 @@ struct ModelsView: View {
             .navigationTitle("Models")
             .accessibilityIdentifier("homeScreen")
             .navigationDestination(for: Int.self) { personID in
-                PersonDetailView(personID: personID, services: services, onOpenImage: onOpenImage)
+                PersonDetailView(personID: personID)
             }
         }
     }
@@ -70,7 +63,7 @@ struct ModelsView: View {
                 ) {
                     ForEach(viewModel.people) { person in
                         NavigationLink(value: person.id) {
-                            ModelCard(person: person, services: services)
+                            ModelCard(person: person)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("person-\(person.id)")
@@ -104,12 +97,11 @@ struct ModelsView: View {
 
 private struct ModelCard: View {
     let person: MonekarAPI.Person
-    let services: AppServices
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GalleryThumbnail(
-                reference: person.thumbnailURL, services: services,
+                reference: person.thumbnailURL,
                 label: person.name
             )
             VStack(alignment: .leading, spacing: 6) {

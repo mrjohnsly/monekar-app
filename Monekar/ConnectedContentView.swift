@@ -1,13 +1,8 @@
 import SwiftUI
 
 struct ConnectedContentView<Content: View>: View {
-    @State private var viewModel: HomeViewModel
-    let content: () -> Content
-
-    init(services: AppServices, @ViewBuilder content: @escaping () -> Content) {
-        _viewModel = State(initialValue: HomeViewModel(services: services))
-        self.content = content
-    }
+    let viewModel: HomeViewModel
+    @ViewBuilder var content: () -> Content
 
     var body: some View {
         Group {

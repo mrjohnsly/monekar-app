@@ -1,56 +1,56 @@
 import SwiftUI
 
 struct ContentView: View {
-    let services: AppServices
-    @State private var imageViewerSelection: ImageViewerSelection?
+    @Environment(AppServices.self) private var services
+    @State var models: WindowModels
+    @State var presentation: ImagePresentation
 
     var body: some View {
+        let browsing = models.browsing
         TabView {
             Tab {
-                ModelsView(services: services, onOpenImage: openImage)
-                    .id(services.connectionRevision)
+                ModelsView()
+                    .id(browsing.revision)
             } label: {
                 Label("Models", systemImage: "person")
             }
 
             Tab {
-                FavouritesView(services: services, onOpenImage: openImage)
-                    .id(services.connectionRevision)
+                FavouritesView()
+                    .id(browsing.revision)
             } label: {
                 Label("Favourites", systemImage: "heart")
             }
 
             Tab {
-                TagsView(services: services, onOpenImage: openImage)
-                    .id(services.connectionRevision)
+                TagsView()
+                    .id(browsing.revision)
             } label: {
                 Label("Tags", systemImage: "tag")
             }
 
             Tab {
-                SettingsView(services: services)
+                SettingsView()
             } label: {
                 Label("Settings", systemImage: "gear")
             }
         }
         .tabViewStyle(.sidebarAdaptable)
         .onChange(of: services.connectionRevision) {
-            imageViewerSelection = nil
+            presentation.dismiss()
+            models.connection.synchronizeConnection()
         }
-        .toolbar(imageViewerSelection == nil ? .automatic : .hidden)
+        .toolbar(presentation.selection == nil ? .automatic : .hidden)
         .overlay {
-            if let selection = imageViewerSelection {
-                ImageViewer(selection: selection, services: services) {
-                    imageViewerSelection = nil
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black)
-                .ignoresSafeArea()
+            if let selection = presentation.selection {
+                ImageViewer(selection: selection, selectedIndex: selection.initialIndex)
+                    .id(selection.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.black)
+                    .ignoresSafeArea()
             }
         }
-    }
-
-    private func openImage(_ selection: ImageViewerSelection) {
-        imageViewerSelection = selection
+        .environment(models)
+        .environment(presentation)
     }
 }

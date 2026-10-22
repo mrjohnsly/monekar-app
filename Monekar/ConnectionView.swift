@@ -1,12 +1,10 @@
 import SwiftUI
 
 struct ConnectionView: View {
-    @State private var viewModel: ConnectionViewModel
+    @Environment(WindowModels.self) private var models
     @Environment(\.dismiss) private var dismiss
 
-    init(services: AppServices) {
-        _viewModel = State(initialValue: ConnectionViewModel(services: services))
-    }
+    private var viewModel: ConnectionViewModel { models.connection }
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -67,5 +65,6 @@ struct ConnectionView: View {
         .padding()
         .navigationTitle("Connection")
         .accessibilityIdentifier("connectionScreen")
+        .onAppear { viewModel.synchronizeConnection() }
     }
 }
