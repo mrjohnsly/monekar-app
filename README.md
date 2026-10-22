@@ -18,9 +18,9 @@ To verify on macOS, save a connection, quit the app, change a source file, and r
 
 ## Architecture
 
-`Monekar/Core` contains the API contract, transport, connection and credential abstractions, observable view models, and app coordinator. It is built directly by SwiftPM so this logic can be tested without SwiftUI or a server. SwiftUI screens live under `Monekar/` and use the coordinator and view models rather than making network requests directly. `AppServices` supplies shared API, Keychain credential, media, image-library, and scan services.
+`Monekar/Core` contains the API contract, transport, connection and credential abstractions, and observable view models. It is built directly by SwiftPM so this logic can be tested without SwiftUI or a server. SwiftUI screens live under `Monekar/` and use view models rather than making network requests directly. `AppServices` supplies shared API, Keychain credential, media, image-library, and scan services.
 
-`ContentView` declares the Models, Favourites, Tags, and Settings tabs using a sidebar-adaptable tab view. Each tab has its own navigation stack. `ModelsView` holds an observable `ModelsViewModel` in SwiftUI state; the model uses the shared API service and pagination logic to fetch people. Connection setup and library scanning are available under Settings. The other gallery screens retain their existing coordinator-based implementation.
+`ContentView` declares `ModelsView`, `FavouritesView`, `TagsView`, and `SettingsView` as sidebar-adaptable tabs. Each tab owns a `NavigationStack` and uses direct `NavigationLink` destinations, without a coordinator or navigation wrapper. Screens keep their view models in SwiftUI state. `ModelsViewModel` uses the shared API service and pagination logic to fetch people. Connection setup and library scanning are available under Settings; browsing tabs show connection or sign-in guidance until configured. Successful connection saves/removals update the shared `AppServices.connectionRevision`, resetting browsing stacks and models across windows while leaving the Settings navigation intact.
 
 ## Connecting to a local server
 

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -50,11 +51,12 @@ protocol ConnectionMetadataService {
 }
 
 @MainActor
-struct AppServices {
+@Observable
+final class AppServices {
     let api: any APIService
     let credentials: any CredentialService
     let connectionMetadata: any ConnectionMetadataService
-    let navigationSession = AppNavigationSession()
+    private(set) var connectionRevision = UUID()
     let media: MediaLoader
     let imageLibrary: ImageLibrary
     let libraryScan: LibraryScanViewModel
@@ -66,5 +68,11 @@ struct AppServices {
         media = MediaLoader(api: api)
         imageLibrary = ImageLibrary(api: api)
         libraryScan = LibraryScanViewModel(api: api)
+    }
+
+    func connectionDidChange() {
+        imageLibrary.synchronizeConnection()
+        libraryScan.synchronizeConnection()
+        connectionRevision = UUID()
     }
 }

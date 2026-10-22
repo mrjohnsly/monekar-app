@@ -2,14 +2,26 @@ import SwiftUI
 
 struct ModelsView: View {
     @State private var viewModel: ModelsViewModel
-    let coordinator: AppCoordinator
+    let services: AppServices
+    let onOpenImage: (ImageViewerSelection) -> Void
 
-    init(coordinator: AppCoordinator) {
-        self.coordinator = coordinator
-        _viewModel = State(initialValue: coordinator.people)
+    init(services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
+        self.services = services
+        self.onOpenImage = onOpenImage
+        _viewModel = State(initialValue: ModelsViewModel(api: services.api))
     }
 
     var body: some View {
+        NavigationStack {
+            ConnectedContentView(services: services) {
+                models
+            }
+            .navigationTitle("Models")
+            .accessibilityIdentifier("homeScreen")
+        }
+    }
+
+    private var models: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 LazyVGrid(
@@ -17,9 +29,13 @@ struct ModelsView: View {
                     alignment: .leading, spacing: 20
                 ) {
                     ForEach(viewModel.people) { person in
-                        ModelCard(person: person, services: coordinator.services) {
-                            coordinator.showPerson(id: person.id)
+                        NavigationLink {
+                            PersonDetailView(personID: person.id, services: services, onOpenImage: onOpenImage)
+                        } label: {
+                            ModelCard(person: person, services: services)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("person-\(person.id)")
                     }
                 }
                 if viewModel.people.isEmpty && viewModel.state == .empty {
@@ -51,28 +67,23 @@ struct ModelsView: View {
 private struct ModelCard: View {
     let person: MonekarAPI.Person
     let services: AppServices
-    let open: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GalleryThumbnail(
                 reference: person.thumbnailURL, services: services,
-                label: person.name, open: open
+                label: person.name
             )
-            Button(action: open) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(person.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("\(person.albumCount) albums · \(person.imageCount) images")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 6) {
+                Text(person.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text("\(person.albumCount) albums · \(person.imageCount) images")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("person-\(person.id)")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
     }
 }

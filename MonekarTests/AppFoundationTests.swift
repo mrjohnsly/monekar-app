@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 #if SWIFT_PACKAGE
 @testable import MonekarCore
@@ -10,26 +11,28 @@ import Testing
 struct AppFoundationTests {
     private let serverURL = URL(string: "https://example.invalid")!
 
-    @Test func launchStartsAtRootAndNavigationReturnsHome() {
-        let coordinator = AppCoordinator(services: services())
-        #expect(coordinator.path.isEmpty)
-        #expect(coordinator.home.state == .idle)
-        coordinator.showConnection()
-        coordinator.showConnection()
-        #expect(coordinator.path == [.connection])
-        coordinator.pop()
-        coordinator.pop()
-        #expect(coordinator.path.isEmpty)
-        coordinator.showConnection()
-        coordinator.reset()
-        #expect(coordinator.path.isEmpty)
+    @Test func launchConnectionStateStartsIdle() {
+        let model = HomeViewModel(services: services())
+        #expect(model.state == .idle)
     }
 
-    @Test func windowsHaveIndependentNavigation() {
-        let first = AppCoordinator(services: services())
-        let second = AppCoordinator(services: services())
-        first.showConnection()
-        #expect(second.path.isEmpty)
+    @Test func connectionRevisionIsObservableAcrossSharedWindows() async {
+        let firstWindow = services()
+        let secondWindow = firstWindow
+        let separateApp = services()
+        let originalRevision = firstWindow.connectionRevision
+        let separateRevision = separateApp.connectionRevision
+        await confirmation("Shared windows invalidate browsing state") { changed in
+            withObservationTracking {
+                _ = secondWindow.connectionRevision
+            } onChange: {
+                changed()
+            }
+            firstWindow.connectionDidChange()
+        }
+        #expect(firstWindow.connectionRevision != originalRevision)
+        #expect(secondWindow.connectionRevision == firstWindow.connectionRevision)
+        #expect(separateApp.connectionRevision == separateRevision)
     }
 
     @Test func unconfiguredLaunchShowsEmptyState() async {

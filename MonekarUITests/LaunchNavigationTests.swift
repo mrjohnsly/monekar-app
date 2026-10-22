@@ -54,6 +54,20 @@ final class LaunchNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["closeConnection"].waitForExistence(timeout: 5))
     }
 
+    func testSettingsNavigationCanReturnUsingTheBackButton() {
+        let app = XCUIApplication()
+        app.launch()
+        openTab("Settings", in: app)
+
+        app.buttons["showConnection"].tap()
+        XCTAssertTrue(app.buttons["closeConnection"].waitForExistence(timeout: 5))
+        app.navigationBars["Connection"].buttons.element(boundBy: 0).tap()
+
+        XCTAssertTrue(app.buttons["showConnection"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["showLibraryScan"].exists)
+        XCTAssertFalse(app.buttons["closeConnection"].exists)
+    }
+
     private func openTab(_ title: String, in app: XCUIApplication) {
         let tab = app.buttons[title].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 5))

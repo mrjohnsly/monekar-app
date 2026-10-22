@@ -159,6 +159,7 @@ struct ServerConnectionTests {
         let configuration = try ServerConnection(serverURL: "http://server.local", username: "alice")
         let api = URLSessionAPIService(configuration: nil, credentials: credentials, transport: transport)
         let services = AppServices(api: api, credentials: credentials, connectionMetadata: metadata)
+        let originalRevision = services.connectionRevision
         let model = ConnectionViewModel(services: services)
         model.serverURL = "http://server.local/"
         model.username = "alice"
@@ -171,6 +172,37 @@ struct ServerConnectionTests {
         #expect(credentials.storedPassword == "secret")
         #expect(api.baseURL == configuration.baseURL)
         #expect(model.password.isEmpty)
+        #expect(services.connectionRevision != originalRevision)
+    }
+
+    @Test func savingTheSameConnectionAndRemovingItInvalidateBrowsingState() async {
+        let transport = StubTransport()
+        let credentials = StubCredentials()
+        let metadata = StubMetadata()
+        let api = URLSessionAPIService(configuration: nil, credentials: credentials, transport: transport)
+        let services = AppServices(api: api, credentials: credentials, connectionMetadata: metadata)
+        let model = ConnectionViewModel(services: services)
+        model.serverURL = "https://example.invalid"
+        model.username = "alice"
+        model.password = "test-value"
+        await model.verifyAndSave()
+        let originalConfiguration = metadata.configuration
+        let originalRevision = services.connectionRevision
+        let originalSession = api.mediaSessionID
+
+        await model.verifyAndSave()
+
+        #expect(model.state == .connected)
+        #expect(metadata.configuration == originalConfiguration)
+        #expect(services.connectionRevision != originalRevision)
+        #expect(api.mediaSessionID != originalSession)
+        let savedRevision = services.connectionRevision
+        await model.removeConnection()
+        #expect(model.state == .removed)
+        #expect(services.connectionRevision != savedRevision)
+        #expect(api.configuration == nil)
+        #expect(metadata.configuration == nil)
+        #expect(credentials.storedPassword == nil)
     }
 
     @Test func failedHealthCheckDoesNotSaveCredentialsOrMetadata() async throws {
@@ -178,9 +210,9 @@ struct ServerConnectionTests {
         let credentials = StubCredentials()
         let metadata = StubMetadata()
         let api = URLSessionAPIService(configuration: nil, credentials: credentials, transport: transport)
-        let model = ConnectionViewModel(
-            services: AppServices(api: api, credentials: credentials, connectionMetadata: metadata)
-        )
+        let services = AppServices(api: api, credentials: credentials, connectionMetadata: metadata)
+        let originalRevision = services.connectionRevision
+        let model = ConnectionViewModel(services: services)
         model.serverURL = "http://server.local"
         model.username = "alice"
         model.password = "secret"
@@ -190,6 +222,7 @@ struct ServerConnectionTests {
         #expect(model.state == .failed(.unreachable))
         #expect(metadata.configuration == nil)
         #expect(credentials.storedPassword == nil)
+        #expect(services.connectionRevision == originalRevision)
     }
 
     @Test func keychainFailurePreservesTheOperatingSystemStatus() {

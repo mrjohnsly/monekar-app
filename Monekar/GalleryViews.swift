@@ -25,43 +25,18 @@ struct ImageFeedView: View {
     }
 }
 
-struct TagsView: View {
-    let coordinator: AppCoordinator
-
-    private var viewModel: PaginatedViewModel<MonekarAPI.Tag> { coordinator.tags }
-
-    var body: some View {
-        List {
-            ForEach(viewModel.items) { tag in
-                NavigationLink(tag.name, value: AppRoute.tag(tag))
-            }
-            if viewModel.state == .empty {
-                Text("No tags").foregroundStyle(.secondary)
-            }
-            GalleryFooter(
-                count: viewModel.items.count, total: viewModel.total,
-                isLoading: viewModel.isLoading || viewModel.state == .idle,
-                hasError: viewModel.hasError, hasMore: viewModel.hasMore,
-                retry: { await viewModel.retry() },
-                loadMore: { await viewModel.loadMore() }
-            )
-        }
-        .navigationTitle("Tags")
-        .task(id: coordinator.services.imageLibrary.revision) { await viewModel.refreshWhenReady() }
-        .refreshable { await viewModel.refresh() }
-        .toolbar {
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                Task { await viewModel.refresh() }
-            }
-            .disabled(viewModel.isLoading)
-        }
-    }
-}
-
 struct PersonDetailView: View {
-    let viewModel: PersonViewModel
-    let coordinator: AppCoordinator
+    @State private var viewModel: PersonViewModel
+    let services: AppServices
     let onOpenImage: (ImageViewerSelection) -> Void
+
+    init(personID: Int, services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
+        self.services = services
+        self.onOpenImage = onOpenImage
+        _viewModel = State(initialValue: PersonViewModel(
+            id: personID, api: services.api, imageLibrary: services.imageLibrary
+        ))
+    }
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -97,10 +72,10 @@ struct PersonDetailView: View {
 
                 switch viewModel.selection {
                 case .albums:
-                    AlbumGrid(viewModel: viewModel.albums, coordinator: coordinator)
+                    AlbumGrid(viewModel: viewModel.albums, services: services, onOpenImage: onOpenImage)
                 case .images:
                     ImageGrid(
-                        viewModel: viewModel.images, services: coordinator.services,
+                        viewModel: viewModel.images, services: services,
                         onOpenImage: onOpenImage
                     )
                 }
@@ -146,9 +121,17 @@ struct PersonDetailView: View {
 }
 
 struct AlbumDetailView: View {
-    let viewModel: AlbumViewModel
+    @State private var viewModel: AlbumViewModel
     let services: AppServices
     let onOpenImage: (ImageViewerSelection) -> Void
+
+    init(albumID: Int, services: AppServices, onOpenImage: @escaping (ImageViewerSelection) -> Void) {
+        self.services = services
+        self.onOpenImage = onOpenImage
+        _viewModel = State(initialValue: AlbumViewModel(
+            id: albumID, api: services.api, imageLibrary: services.imageLibrary
+        ))
+    }
 
     var body: some View {
         ScrollView {
@@ -213,22 +196,22 @@ struct AlbumDetailView: View {
 
 private struct AlbumGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Album>
-    let coordinator: AppCoordinator
+    let services: AppServices
+    let onOpenImage: (ImageViewerSelection) -> Void
 
     var body: some View {
         VStack(spacing: 16) {
             LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 20) {
                 ForEach(viewModel.items) { album in
-                    VStack(alignment: .leading, spacing: 6) {
-                        GalleryThumbnail(
-                            reference: album.thumbnailURL,
-                            services: coordinator.services,
-                            label: album.name,
-                            open: { coordinator.showAlbum(id: album.id) }
-                        )
-                        Button {
-                            coordinator.showAlbum(id: album.id)
-                        } label: {
+                    NavigationLink {
+                        AlbumDetailView(albumID: album.id, services: services, onOpenImage: onOpenImage)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            GalleryThumbnail(
+                                reference: album.thumbnailURL,
+                                services: services,
+                                label: album.name
+                            )
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(album.name).font(.headline).foregroundStyle(.primary)
                                 Text("\(album.imageCount) images").font(.caption).foregroundStyle(.secondary)
@@ -239,9 +222,9 @@ private struct AlbumGrid: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("album-\(album.id)")
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("album-\(album.id)")
                 }
             }
             if viewModel.items.isEmpty && viewModel.state == .empty {
@@ -382,6 +365,14 @@ struct GalleryThumbnail: View {
     }
 
     var body: some View {
+        if let open {
+            thumbnail.onTapGesture(perform: open)
+        } else {
+            thumbnail
+        }
+    }
+
+    private var thumbnail: some View {
         Rectangle()
             .fill(.quaternary)
             .aspectRatio(1, contentMode: .fit)
@@ -404,7 +395,6 @@ struct GalleryThumbnail: View {
                         }
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { open?() }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 10))

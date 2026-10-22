@@ -43,6 +43,7 @@ final class ConnectionViewModel {
             try await services.credentials.setPassword(savedPassword)
             try services.connectionMetadata.save(configuration)
             services.api.configure(configuration)
+            services.connectionDidChange()
             serverURL = configuration.baseURL.absoluteString
             username = configuration.username
             password = ""
@@ -67,6 +68,7 @@ final class ConnectionViewModel {
             try services.connectionMetadata.remove()
             try await services.credentials.setPassword(nil)
             services.api.configure(nil)
+            services.connectionDidChange()
             hasSavedConnection = false
             serverURL = ""
             username = ""

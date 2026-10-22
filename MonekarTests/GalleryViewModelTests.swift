@@ -299,99 +299,69 @@ struct GalleryViewModelTests {
         #expect(albumModel.detail.state == .loaded(GalleryAPI.album))
     }
 
-    @Test func coordinatorPreservesScreenModelsAndSelectionsAcrossNavigation() async {
+    @Test func screenOwnedModelsPreserveLoadedDataAndSelection() async {
         let (services, _) = galleryServices()
-        let coordinator = AppCoordinator(services: services)
-        await coordinator.people.fetchPeople()
-        #expect(coordinator.people.people == [person(7)])
-        coordinator.showPerson(id: 7)
-        coordinator.showPerson(id: 7)
-        let personModel = coordinator.person(id: 7)
+        let models = ModelsViewModel(api: services.api)
+        await models.fetchPeople()
+        let personModel = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
         await personModel.images.loadIfNeeded()
         personModel.selection = .images
-        coordinator.showAlbum(id: 9)
-        coordinator.showAlbum(id: 9)
-        let albumModel = coordinator.album(id: 9)
+        let albumModel = AlbumViewModel(id: 9, api: services.api, imageLibrary: services.imageLibrary)
         await albumModel.images.loadIfNeeded()
-        #expect(coordinator.path == [.person(7), .album(9)])
-        coordinator.showConnection()
-        coordinator.connectionDidChange()
-        coordinator.pop()
-        #expect(coordinator.path == [.person(7), .album(9)])
-        coordinator.pop()
-        #expect(coordinator.person(id: 7) === personModel)
-        #expect(coordinator.person(id: 7).selection == .images)
-        #expect(coordinator.person(id: 7).images.items.count == 1)
-        coordinator.showAlbum(id: 9)
-        #expect(coordinator.album(id: 9) === albumModel)
-        coordinator.reset()
-        #expect(coordinator.path.isEmpty)
-        #expect(coordinator.people.people == [person(7)])
+        await models.fetchPeople()
+        await personModel.images.loadIfNeeded()
+        #expect(personModel.selection == .images)
+        #expect(personModel.images.items.count == 1)
+        #expect(albumModel.images.items.count == 1)
+        #expect(models.people == [person(7)])
+        #expect((services.api as? GalleryAPI)?.requests.count == 3)
     }
 
     @Test func windowsHaveIndependentGalleryState() {
         let (services, _) = galleryServices()
-        let first = AppCoordinator(services: services)
-        let second = AppCoordinator(services: services)
-        first.showPerson(id: 7)
-        first.person(id: 7).selection = .images
-        #expect(second.path.isEmpty)
-        #expect(second.person(id: 7).selection == .albums)
-        #expect(first.people !== second.people)
+        let first = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
+        let second = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
+        first.selection = .images
+        #expect(second.selection == .albums)
+        #expect(first.images !== second.images)
     }
 
     @Test func connectionChangesDiscardPreviousServerGallery() async throws {
         let (services, metadata) = galleryServices()
-        let coordinator = AppCoordinator(services: services)
-        let oldPeople = coordinator.people
-        let oldPerson = coordinator.person(id: 7)
-        let oldAlbum = coordinator.album(id: 9)
-        coordinator.showPerson(id: 7)
-        coordinator.showAlbum(id: 9)
-        coordinator.showConnection()
-        try metadata.save(ServerConnection(serverURL: "https://other.invalid", username: "other"))
-        coordinator.connectionDidChange()
-        #expect(coordinator.path == [.connection])
-        coordinator.pop()
-        #expect(coordinator.path.isEmpty)
-        #expect(coordinator.people !== oldPeople)
-        #expect(coordinator.people.state == .idle)
-        #expect(coordinator.person(id: 7) !== oldPerson)
-        #expect(coordinator.album(id: 9) !== oldAlbum)
-        coordinator.showPerson(id: 7)
-        try metadata.remove()
-        coordinator.connectionDidChange()
-        #expect(coordinator.path.isEmpty)
-    }
-
-    @Test func connectionChangesInvalidateEveryWindowSharingTheAPI() async throws {
-        let (services, metadata) = galleryServices()
-        let first = AppCoordinator(services: services)
-        let second = AppCoordinator(services: services)
-        await second.people.fetchPeople()
-        let oldPeople = second.people
-        let oldPerson = second.person(id: 7)
-        second.showPerson(id: 7)
-        second.showAlbum(id: 9)
-        first.showConnection()
+        let originalRevision = services.connectionRevision
+        let oldPerson = PersonViewModel(id: 7, api: services.api, imageLibrary: services.imageLibrary)
+        await oldPerson.images.loadIfNeeded()
+        let oldImage = try #require(oldPerson.images.items.first)
+        let oldImageModel = services.imageLibrary.model(for: oldImage)
         try metadata.save(ServerConnection(serverURL: "https://other.invalid", username: "other"))
         services.api.configure(metadata.configuration)
-        first.connectionDidChange()
-        #expect(first.path == [.connection])
-        #expect(second.path.isEmpty)
-        #expect(second.people !== oldPeople)
-        #expect(second.people.state == .idle)
-        #expect(second.person(id: 7) !== oldPerson)
-        #expect(second.person(id: 7).selection == .albums)
-        let newPeople = second.people
-        first.connectionDidChange()
-        #expect(second.people === newPeople)
-        second.showPerson(id: 7)
+        services.connectionDidChange()
+        #expect(services.connectionRevision != originalRevision)
+        #expect(services.imageLibrary.model(for: oldImage) !== oldImageModel)
+        let newPeople = ModelsViewModel(api: services.api)
+        #expect(newPeople.state == .idle)
+        #expect(newPeople.people.isEmpty)
+        let connectedRevision = services.connectionRevision
         try metadata.remove()
         services.api.configure(nil)
-        first.connectionDidChange()
-        #expect(second.path.isEmpty)
-        #expect(second.people !== newPeople)
+        services.connectionDidChange()
+        #expect(services.connectionRevision != connectedRevision)
+        #expect(services.api.baseURL == nil)
+    }
+
+    @Test func connectionChangesInvalidateEveryWindowSharingServices() async throws {
+        let (services, metadata) = galleryServices()
+        let secondWindowServices = services
+        let originalRevision = secondWindowServices.connectionRevision
+        try metadata.save(ServerConnection(serverURL: "https://other.invalid", username: "other"))
+        services.api.configure(metadata.configuration)
+        services.connectionDidChange()
+        #expect(secondWindowServices.connectionRevision != originalRevision)
+        let connectedRevision = secondWindowServices.connectionRevision
+        try metadata.remove()
+        services.api.configure(nil)
+        services.connectionDidChange()
+        #expect(secondWindowServices.connectionRevision != connectedRevision)
     }
 }
 
@@ -408,6 +378,7 @@ private func galleryServices() -> (AppServices, GalleryMetadata) {
 @MainActor
 private final class GalleryAPI: APIService {
     var baseURL: URL? = URL(string: "https://example.invalid")
+    var mediaSessionID: UUID? = UUID()
     var requests: [APIRequest] = []
     static let album = MonekarAPI.Album(
         id: 9, personID: 7, name: "Server album", date: "2026-10-01", models: ["Server models"],
@@ -419,7 +390,10 @@ private final class GalleryAPI: APIService {
         isFavourite: false, tags: []
     )
 
-    func configure(_ configuration: ServerConnection?) { baseURL = configuration?.baseURL }
+    func configure(_ configuration: ServerConnection?) {
+        baseURL = configuration?.baseURL
+        mediaSessionID = UUID()
+    }
     func verifyConnection(_ configuration: ServerConnection?) async throws {}
     func get(path: [String]) async throws -> Data { Data() }
     func get(mediaReference: String) async throws -> Data { Data() }
