@@ -56,11 +56,68 @@ struct PeopleView: View {
         .task { await viewModel.loadIfNeeded() }
         .refreshable { await viewModel.refresh() }
         .toolbar {
+            NavigationLink("Favourites", value: AppRoute.favourites)
+            NavigationLink("Tags", value: AppRoute.tags)
             Button("Refresh", systemImage: "arrow.clockwise") {
                 Task { await viewModel.refresh() }
             }
             .disabled(viewModel.isLoading)
             .accessibilityIdentifier("refreshPeople")
+        }
+    }
+}
+
+struct ImageFeedView: View {
+    let title: String
+    let viewModel: PaginatedViewModel<MonekarAPI.Image>
+    let services: AppServices
+
+    var body: some View {
+        ScrollView {
+            ImageGrid(viewModel: viewModel, services: services)
+                .padding()
+        }
+        .navigationTitle(title)
+        .task(id: services.imageLibrary.revision) { await viewModel.refreshWhenReady() }
+        .refreshable { await viewModel.refresh() }
+        .toolbar {
+            Button("Refresh", systemImage: "arrow.clockwise") {
+                Task { await viewModel.refresh() }
+            }
+            .disabled(viewModel.isLoading)
+        }
+    }
+}
+
+struct TagsView: View {
+    let coordinator: AppCoordinator
+
+    private var viewModel: PaginatedViewModel<MonekarAPI.Tag> { coordinator.tags }
+
+    var body: some View {
+        List {
+            ForEach(viewModel.items) { tag in
+                NavigationLink(tag.name, value: AppRoute.tag(tag))
+            }
+            if viewModel.state == .empty {
+                Text("No tags").foregroundStyle(.secondary)
+            }
+            GalleryFooter(
+                count: viewModel.items.count, total: viewModel.total,
+                isLoading: viewModel.isLoading || viewModel.state == .idle,
+                hasError: viewModel.hasError, hasMore: viewModel.hasMore,
+                retry: { await viewModel.retry() },
+                loadMore: { await viewModel.loadMore() }
+            )
+        }
+        .navigationTitle("Tags")
+        .task(id: coordinator.services.imageLibrary.revision) { await viewModel.refreshWhenReady() }
+        .refreshable { await viewModel.refresh() }
+        .toolbar {
+            Button("Refresh", systemImage: "arrow.clockwise") {
+                Task { await viewModel.refresh() }
+            }
+            .disabled(viewModel.isLoading)
         }
     }
 }
@@ -279,7 +336,9 @@ private struct ImageGrid: View {
     var body: some View {
         VStack(spacing: 16) {
             LazyVGrid(columns: galleryColumns, alignment: .leading, spacing: 20) {
-                ForEach(viewModel.items) { image in
+                ForEach(viewModel.items) { item in
+                    let model = services.imageLibrary.model(for: item)
+                    let image = model.image
                     VStack(alignment: .leading, spacing: 6) {
                         GalleryThumbnail(
                             reference: image.thumbnailURL, services: services, label: image.fileName,
@@ -293,9 +352,7 @@ private struct ImageGrid: View {
                         if let width = image.width, let height = image.height {
                             Text("\(width) × \(height)").font(.caption).foregroundStyle(.secondary)
                         }
-                        if image.isFavourite {
-                            Label("Favourite", systemImage: "heart.fill").font(.caption)
-                        }
+                        ImageManagementControls(viewModel: model)
                         if !image.tags.isEmpty {
                             Text(image.tags.map(\.name).joined(separator: ", "))
                                 .font(.caption).foregroundStyle(.secondary)

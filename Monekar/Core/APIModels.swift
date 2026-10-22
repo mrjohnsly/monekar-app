@@ -32,7 +32,7 @@ nonisolated enum MonekarAPI {
         let thumbnailURL: String
         let originalURL: String
         let isFavourite: Bool
-        let tags: [Tag]
+        var tags: [Tag]
     }
 
     nonisolated struct Tag: Codable, Hashable, Sendable, Identifiable {

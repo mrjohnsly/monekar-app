@@ -113,6 +113,12 @@ struct ImageViewer: View {
                 )
             }
             .background(.black)
+            .safeAreaInset(edge: .bottom) {
+                ImageManagementControls(viewModel: services.imageLibrary.model(for: image))
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+            }
             .navigationTitle(image.fileName)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -135,6 +141,88 @@ struct ImageViewer: View {
         #if os(macOS)
         .background(FullScreenWindow())
         #endif
+    }
+}
+
+struct ImageManagementControls: View {
+    let viewModel: ImageViewModel
+    @State private var showsTags = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button(
+                    viewModel.image.isFavourite ? "Unfavourite" : "Favourite",
+                    systemImage: viewModel.image.isFavourite ? "heart.fill" : "heart"
+                ) {
+                    Task { await viewModel.setFavourite(!viewModel.image.isFavourite) }
+                }
+                .disabled(viewModel.isBusy)
+                .accessibilityIdentifier("favourite-\(viewModel.image.id)")
+                Button("Tags", systemImage: "tag") { showsTags = true }
+                    .accessibilityIdentifier("tags-\(viewModel.image.id)")
+            }
+            .buttonStyle(.bordered)
+            if let message = viewModel.errorMessage {
+                Text(message).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .sheet(isPresented: $showsTags) {
+            ImageTagsView(viewModel: viewModel)
+        }
+    }
+}
+
+private struct ImageTagsView: View {
+    @Bindable var viewModel: ImageViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Image tags") {
+                    if viewModel.image.tags.isEmpty {
+                        Text("No tags").foregroundStyle(.secondary)
+                    }
+                    ForEach(viewModel.image.tags) { tag in
+                        HStack {
+                            Text(tag.name)
+                            Spacer()
+                            Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                                Task { await viewModel.removeTag(id: tag.id) }
+                            }
+                            .accessibilityLabel("Remove tag: \(tag.name)")
+                            .disabled(viewModel.isBusy)
+                        }
+                    }
+                }
+                Section("Add tag") {
+                    TextField("Tag name", text: $viewModel.tagName)
+                        .onSubmit { Task { await viewModel.addTag() } }
+                        .accessibilityIdentifier("tagName")
+                    Button("Add tag") { Task { await viewModel.addTag() } }
+                        .disabled(viewModel.isBusy)
+                }
+                if viewModel.isBusy { ProgressView("Updating image…") }
+                if let message = viewModel.errorMessage {
+                    Text(message).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Tags")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Reload tags", systemImage: "arrow.clockwise") {
+                        Task { await viewModel.loadTags() }
+                    }
+                    .disabled(viewModel.isBusy)
+                }
+            }
+            .task { await viewModel.loadTags() }
+        }
+        .frame(minWidth: 280, minHeight: 320)
     }
 }
 

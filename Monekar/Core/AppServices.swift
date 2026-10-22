@@ -56,11 +56,13 @@ struct AppServices {
     let connectionMetadata: any ConnectionMetadataService
     let navigationSession = AppNavigationSession()
     let media: MediaLoader
+    let imageLibrary: ImageLibrary
 
     init(api: any APIService, credentials: any CredentialService, connectionMetadata: any ConnectionMetadataService) {
         self.api = api
         self.credentials = credentials
         self.connectionMetadata = connectionMetadata
         media = MediaLoader(api: api)
+        imageLibrary = ImageLibrary(api: api)
     }
 }

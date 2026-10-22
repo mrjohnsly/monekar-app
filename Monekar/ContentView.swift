@@ -30,6 +30,18 @@ struct ContentView: View {
                             viewModel: coordinator.album(id: id),
                             services: coordinator.services
                         )
+                    case .favourites:
+                        ImageFeedView(
+                            title: "Favourites", viewModel: coordinator.favourites,
+                            services: coordinator.services
+                        )
+                    case .tags:
+                        TagsView(coordinator: coordinator)
+                    case .tag(let tag):
+                        ImageFeedView(
+                            title: tag.name, viewModel: coordinator.tagImages(id: tag.id),
+                            services: coordinator.services
+                        )
                     case .connection:
                         ConnectionView(
                             services: coordinator.services,
