@@ -24,6 +24,11 @@ struct AlbumView: View {
                     } placeholder: {
                         ProgressView()
                     }
+                    .task {
+                        if image.id == viewModel.images.last?.id {
+                            await viewModel.fetchImages(albumID: album.id)
+                        }
+                    }
                 }
             }
         }
