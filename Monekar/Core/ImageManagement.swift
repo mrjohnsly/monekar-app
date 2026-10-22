@@ -37,15 +37,14 @@ final class ImageLibrary {
         PaginatedViewModel { [self] limit, offset in
             synchronizeConnection()
             let session = api.mediaSessionID
-            let version = revision
+            let versions = models.mapValues(\.revision)
             let page = try await fetch(limit, offset)
             try Task.checkCancellation()
             guard session == api.mediaSessionID else { throw CancellationError() }
-            // A read started before a mutation must not replace its confirmed response.
-            if version == revision {
-                for image in page.items {
-                    model(for: image).receive(image)
-                }
+            for image in page.items {
+                // Preserve mutations to this image, not unrelated images on the page.
+                if let model = models[image.id], versions[image.id] != model.revision { continue }
+                model(for: image).receive(image)
             }
             return page
         }
@@ -58,6 +57,7 @@ final class ImageViewModel {
     private(set) var image: MonekarAPI.Image
     private(set) var isBusy = false
     private(set) var errorMessage: String?
+    private(set) var revision = 0
     var tagName = ""
     private let api: any APIService
     private let sessionID: UUID?
@@ -81,7 +81,7 @@ final class ImageViewModel {
             try checkSession()
             guard updated.id == image.id else { throw ConnectionFailure.invalidResponse }
             image = updated
-            changed()
+            didChange()
         }
     }
 
@@ -92,7 +92,7 @@ final class ImageViewModel {
             try checkSession()
             if tags != image.tags {
                 image.tags = tags
-                changed()
+                didChange()
             }
         }
     }
@@ -112,7 +112,7 @@ final class ImageViewModel {
             } else {
                 image.tags.append(tag)
             }
-            changed()
+            didChange()
         }
         if succeeded && tagName == name { tagName = "" }
     }
@@ -122,12 +122,17 @@ final class ImageViewModel {
             try await api.removeTag(imageID: image.id, tagID: id)
             try checkSession()
             image.tags.removeAll { $0.id == id }
-            changed()
+            didChange()
         }
     }
 
     private func checkSession() throws {
         guard sessionID == api.mediaSessionID else { throw CancellationError() }
+    }
+
+    private func didChange() {
+        revision &+= 1
+        changed()
     }
 
     private func perform(_ operation: () async throws -> Void) async -> Bool {

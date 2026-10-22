@@ -176,6 +176,28 @@ struct ImageManagementTests {
         #expect(api.requests.count == 1)
     }
 
+    @Test func mutationsDoNotDiscardFreshReadsForUnrelatedImages() async {
+        let api = ImageManagementAPI()
+        let library = ImageLibrary(api: api)
+        let first = library.model(for: image(id: 1))
+        let second = library.model(for: image(id: 2))
+        var continuation: CheckedContinuation<MonekarAPI.Page<MonekarAPI.Image>, Never>?
+        let feed = library.feed { _, _ in
+            await withCheckedContinuation { continuation = $0 }
+        }
+        let task = Task { await feed.refresh() }
+        while continuation == nil { await Task.yield() }
+        api.respond = { _ in try JSONEncoder().encode(image(id: 2, favourite: true)) }
+        await second.setFavourite(true)
+        continuation?.resume(returning: .init(
+            items: [image(id: 1, favourite: true), image(id: 2)],
+            total: 2, limit: 50, offset: 0
+        ))
+        await task.value
+        #expect(first.image.isFavourite)
+        #expect(second.image.isFavourite)
+    }
+
     @Test func wrongImageResponseIsRejected() async {
         let api = ImageManagementAPI()
         let model = ImageViewModel(image: image(), api: api)
