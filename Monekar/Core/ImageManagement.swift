@@ -43,7 +43,7 @@ final class ImageLibrary {
             guard session == api.mediaSessionID else { throw CancellationError() }
             for image in page.items {
                 // Preserve mutations to this image, not unrelated images on the page.
-                if let model = models[image.id], versions[image.id] != model.revision { continue }
+                if let model = models[image.id], (versions[image.id] ?? 0) != model.revision { continue }
                 model(for: image).receive(image)
             }
             return page

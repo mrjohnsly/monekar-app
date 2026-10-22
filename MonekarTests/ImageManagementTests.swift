@@ -198,6 +198,29 @@ struct ImageManagementTests {
         #expect(second.image.isFavourite)
     }
 
+    @Test(arguments: [false, true])
+    func modelsCreatedDuringFetchReceiveFreshDataUnlessMutated(mutate: Bool) async {
+        let api = ImageManagementAPI()
+        let library = ImageLibrary(api: api)
+        var continuation: CheckedContinuation<MonekarAPI.Page<MonekarAPI.Image>, Never>?
+        let feed = library.feed { _, _ in
+            await withCheckedContinuation { continuation = $0 }
+        }
+        let task = Task { await feed.refresh() }
+        while continuation == nil { await Task.yield() }
+        let model = library.model(for: image())
+        if mutate {
+            api.respond = { _ in try JSONEncoder().encode(image(tags: [.init(id: 3, name: "New")])) }
+            await model.setFavourite(false)
+        }
+        continuation?.resume(returning: .init(
+            items: [image(favourite: true)], total: 1, limit: 50, offset: 0
+        ))
+        await task.value
+        #expect(model.image.isFavourite == !mutate)
+        #expect(model.image.tags.isEmpty == !mutate)
+    }
+
     @Test func wrongImageResponseIsRejected() async {
         let api = ImageManagementAPI()
         let model = ImageViewModel(image: image(), api: api)
