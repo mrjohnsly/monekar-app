@@ -25,7 +25,7 @@ struct ModelView: View {
                 AlbumView(album: album)
                     .navigationTitle(album.name)
             }
-            .navigationTitle("Models")
+            .navigationTitle(model.name)
         }
         .task {
             await viewModel.fetchAlbums(modelID: model.id)
