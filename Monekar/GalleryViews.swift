@@ -320,17 +320,11 @@ private struct AlbumGrid: View {
 private struct ImageGrid: View {
     let viewModel: PaginatedViewModel<MonekarAPI.Image>
     let services: AppServices
-    @State private var selectedImage: MonekarAPI.Image?
-    #if os(macOS)
-    @Environment(\.openWindow) private var openWindow
-    #endif
+    @State private var selection: ImageViewerSelection?
 
     private func open(_ image: MonekarAPI.Image) {
-        #if os(macOS)
-        openWindow(value: image)
-        #else
-        selectedImage = image
-        #endif
+        let images = viewModel.items.map { services.imageLibrary.model(for: $0).image }
+        selection = ImageViewerSelection(images: images, selectedImageID: image.id)
     }
 
     var body: some View {
@@ -372,11 +366,9 @@ private struct ImageGrid: View {
                 loadMore: { await viewModel.loadMore() }
             )
         }
-        #if os(iOS)
-        .fullScreenCover(item: $selectedImage) { image in
-            ImageViewer(image: image, services: services)
+        .sheet(item: $selection) { selection in
+            ImageViewer(selection: selection, services: services)
         }
-        #endif
     }
 }
 

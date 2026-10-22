@@ -1,7 +1,4 @@
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 struct AuthenticatedImageView: View {
     let reference: String
@@ -83,12 +80,31 @@ struct AuthenticatedImageView: View {
     }
 }
 
+struct ImageViewerSelection: Identifiable {
+    let images: [MonekarAPI.Image]
+    let selectedImageID: Int
+
+    var id: Int { selectedImageID }
+}
+
 struct ImageViewer: View {
-    let image: MonekarAPI.Image
+    let selection: ImageViewerSelection
     let services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var zoom: CGFloat = 1
     @GestureState private var magnification: CGFloat = 1
+    @State private var selectedIndex: Int
+    @FocusState private var isFocused: Bool
+
+    init(selection: ImageViewerSelection, services: AppServices) {
+        self.selection = selection
+        self.services = services
+        _selectedIndex = State(
+            initialValue: selection.images.firstIndex { $0.id == selection.selectedImageID } ?? 0
+        )
+    }
+
+    private var image: MonekarAPI.Image { selection.images[selectedIndex] }
 
     private var effectiveZoom: CGFloat { min(4, max(1, zoom * magnification)) }
 
@@ -106,6 +122,20 @@ struct ImageViewer: View {
                     )
                 }
                 .defaultScrollAnchor(.center)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30)
+                        .onEnded { value in
+                            guard zoom <= 1,
+                                  abs(value.translation.width) > 50,
+                                  abs(value.translation.width) > abs(value.translation.height)
+                            else { return }
+                            if value.translation.width < 0 {
+                                showNextImage()
+                            } else {
+                                showPreviousImage()
+                            }
+                        }
+                )
                 .simultaneousGesture(
                     MagnifyGesture()
                         .updating($magnification) { value, state, _ in state = value.magnification }
@@ -138,9 +168,28 @@ struct ImageViewer: View {
         .preferredColorScheme(.dark)
         .accessibilityIdentifier("imageViewer")
         .onChange(of: services.api.mediaSessionID) { _, _ in dismiss() }
-        #if os(macOS)
-        .background(FullScreenWindow())
-        #endif
+        .focusable()
+        .focused($isFocused)
+        .onAppear { isFocused = true }
+        .onKeyPress(.leftArrow) { _ in
+            showPreviousImage()
+            return .handled
+        }
+        .onKeyPress(.rightArrow) { _ in
+            showNextImage()
+            return .handled
+        }
+        .onChange(of: selectedIndex) { _, _ in zoom = 1 }
+    }
+
+    private func showPreviousImage() {
+        guard selectedIndex > 0 else { return }
+        selectedIndex -= 1
+    }
+
+    private func showNextImage() {
+        guard selectedIndex < selection.images.count - 1 else { return }
+        selectedIndex += 1
     }
 }
 
@@ -225,24 +274,3 @@ private struct ImageTagsView: View {
         .frame(minWidth: 280, minHeight: 320)
     }
 }
-
-#if os(macOS)
-private struct FullScreenWindow: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { FullScreenView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class FullScreenView: NSView {
-        private var requestedFullScreen = false
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            guard let window, !requestedFullScreen else { return }
-            requestedFullScreen = true
-            Task { @MainActor [weak window] in
-                guard let window, !window.styleMask.contains(.fullScreen) else { return }
-                window.toggleFullScreen(nil)
-            }
-        }
-    }
-}
-#endif
