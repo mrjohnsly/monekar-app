@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ModelsView: View {
     @State private var viewModel: ModelsViewModel
+    @State private var connectionViewModel: HomeViewModel
     let services: AppServices
     let onOpenImage: (ImageViewerSelection) -> Void
 
@@ -9,13 +10,49 @@ struct ModelsView: View {
         self.services = services
         self.onOpenImage = onOpenImage
         _viewModel = State(initialValue: ModelsViewModel(api: services.api))
+        _connectionViewModel = State(initialValue: HomeViewModel(services: services))
     }
 
     var body: some View {
         NavigationStack {
-            ConnectedContentView(services: services) {
-                models
+            Group {
+                switch connectionViewModel.state {
+                case .idle, .loading:
+                    ProgressView("Loading connection…")
+                case .empty:
+                    ContentUnavailableView(
+                        "No server configured",
+                        systemImage: "network",
+                        description: Text("Open Settings to set up a server connection.")
+                    )
+                case .loaded(let summary):
+                    if summary.hasCredential {
+                        models
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "server.rack")
+                                .font(.largeTitle)
+                            Text("Sign-in required")
+                                .font(.title)
+                            Text(summary.serverURL.host() ?? "monekar-server")
+                            Text("Open Settings, then Connection to sign in again.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                case .failed:
+                    ContentUnavailableView {
+                        Label("Unable to load connection", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text("Check your configuration and try again.")
+                    } actions: {
+                        Button("Retry") {
+                            Task { await connectionViewModel.load() }
+                        }
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task { await connectionViewModel.loadIfNeeded() }
             .navigationTitle("Models")
             .accessibilityIdentifier("homeScreen")
             .navigationDestination(for: Int.self) { personID in
