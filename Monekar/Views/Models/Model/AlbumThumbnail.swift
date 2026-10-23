@@ -13,14 +13,16 @@ struct AlbumThumbnail: View {
     
     var body: some View {
         VStack {
-            AsyncImage(url: URL(string: album.thumbnailImageURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 250)
-            } placeholder: {
-                ProgressView()
+            ThumbnailFrame {
+                AsyncImage(url: URL(string: album.thumbnailImageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    ProgressView()
+                }
             }
+            .frame(width: 250)
             
             Text(album.name)
         }
