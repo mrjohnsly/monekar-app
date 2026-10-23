@@ -15,11 +15,13 @@ struct ModelView: View {
     
     var body: some View {
         ScrollView {
-            ForEach(viewModel.albums) { album in
-                NavigationLink(value: album) {
-                    AlbumThumbnail(album: album)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 250), spacing: 4)], spacing: 4) {
+                ForEach(viewModel.albums) { album in
+                    NavigationLink(value: album) {
+                        AlbumThumbnail(album: album)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .frame(maxWidth: .infinity)
             .navigationDestination(for: Album.self) { album in
