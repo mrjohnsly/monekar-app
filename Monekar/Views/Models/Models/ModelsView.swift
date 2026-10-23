@@ -18,6 +18,7 @@ struct ModelsView: View {
                         NavigationLink(value: model) {
                             ModelThumbnail(model: model)
                         }
+                        .buttonStyle(.plain)
                         .task {
                             if model.id == viewModel.models.last?.id {
                                 await viewModel.fetchModels()

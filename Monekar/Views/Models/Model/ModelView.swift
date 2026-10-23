@@ -19,6 +19,7 @@ struct ModelView: View {
                 NavigationLink(value: album) {
                     AlbumThumbnail(album: album)
                 }
+                .buttonStyle(.plain)
             }
             .frame(maxWidth: .infinity)
             .navigationDestination(for: Album.self) { album in
