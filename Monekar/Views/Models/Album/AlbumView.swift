@@ -17,8 +17,7 @@ struct AlbumView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 4)], spacing: 4) {
                 ForEach(viewModel.images) { image in
-                    ThumbnailFrame(aspectRatio: image.width > 0 && image.height > 0
-                                   ? CGFloat(image.width) / CGFloat(image.height) : 1) {
+                    ThumbnailFrame(aspectRatio: image.aspectRatio) {
                         AsyncImage(url: URL(string: image.thumbnailImageURL)) { image in
                             image
                                 .resizable()

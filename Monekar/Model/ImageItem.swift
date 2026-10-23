@@ -27,4 +27,8 @@ struct ImageItem: Codable, Equatable, Hashable, Sendable, Identifiable {
     var originalImageURL: String {
         "http://192.168.1.249:8080\(originalURL)"
     }
+    
+    var aspectRatio: CGFloat {
+        width > 0 && height > 0 ? CGFloat(width) / CGFloat(height) : 1
+    }
 }
