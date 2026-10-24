@@ -30,8 +30,6 @@ final class ModelViewModel {
                 throw URLError(.badServerResponse)
             }
             
-            print(httpResponse.statusCode)
-            
             let decoded = try JSONDecoder().decode(AlbumsPage.self, from: data)
             albums = decoded.items
         } catch {

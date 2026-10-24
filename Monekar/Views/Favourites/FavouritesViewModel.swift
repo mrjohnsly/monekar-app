@@ -32,8 +32,6 @@ final class FavouritesViewModel {
                 throw URLError(.badServerResponse)
             }
             
-            print(httpResponse.statusCode)
-            
             let decoded = try JSONDecoder().decode(FavouritesPage.self, from: data)
             favourites = decoded.items
             total = decoded.total

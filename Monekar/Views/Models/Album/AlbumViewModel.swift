@@ -38,8 +38,6 @@ final class AlbumViewModel {
                 throw URLError(.badServerResponse)
             }
             
-            print(httpResponse.statusCode)
-            
             let decoded = try JSONDecoder().decode(ImagesPage.self, from: data)
             images.append(contentsOf: decoded.items)
             offset = (decoded.offset ?? offset) + decoded.items.count

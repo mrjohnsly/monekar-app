@@ -39,8 +39,6 @@ final class ModelsViewModel {
                 throw URLError(.badServerResponse)
             }
             
-            print(httpResponse.statusCode)
-            
             let decoded = try JSONDecoder().decode(ModelsPage.self, from: data)
             models.append(contentsOf: decoded.items)
             offset = decoded.offset + decoded.items.count
