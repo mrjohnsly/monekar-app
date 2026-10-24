@@ -15,7 +15,7 @@ struct ModelView: View {
     
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 250), spacing: 4)], spacing: 4) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                 ForEach(viewModel.albums) { album in
                     NavigationLink(value: album) {
                         AlbumThumbnail(album: album)

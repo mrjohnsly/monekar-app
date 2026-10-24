@@ -13,7 +13,7 @@ struct ModelsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 250), spacing: 4)], spacing: 4) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                     ForEach(viewModel.models) { model in
                         NavigationLink(value: model) {
                             ModelThumbnail(model: model)
