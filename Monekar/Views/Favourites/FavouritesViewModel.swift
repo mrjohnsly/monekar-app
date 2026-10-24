@@ -9,33 +9,23 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 final class FavouritesViewModel {
+    
+    private let apiService: any FavouritesAPIService
     
     var favourites: [ImageItem] = []
     var total: Int = 0
     
+    init(apiService: any FavouritesAPIService = URLSessionFavouritesAPIService()) {
+        self.apiService = apiService
+    }
+    
     func fetchFavourites() async {
-        
-        let username = "admin"
-        let password = "admin123"
-        
-        var request = URLRequest(url: URL(string: "http://192.168.1.249:8080/api/v1/favourites")!)
-        
-        let raw = "\(username):\(password)".data(using: .utf8)!
-            request.setValue("Basic \(raw.base64EncodedString())", forHTTPHeaderField: "Authorization")
-            request.httpMethod = "GET"
-        
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
-            
-            let decoded = try JSONDecoder().decode(FavouritesPage.self, from: data)
-            favourites = decoded.items
-            total = decoded.total
+            let page = try await apiService.fetchFavourites()
+            favourites = page.items
+            total = page.total
         } catch {
             print(error)
         }
