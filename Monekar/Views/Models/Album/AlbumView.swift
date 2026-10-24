@@ -68,60 +68,69 @@ struct GalleryView: View {
     @State var selectedImageID: Int?
     
     var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(viewModel.images) { image in
-                    AsyncImage(url: URL(string: image.originalImageURL)) { loadedImage in
-                        loadedImage
-                            .resizable()
-                            .scaledToFit()
-                    } placeholder: {
-                        ProgressView()
-                            .tint(.white)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(viewModel.images) { image in
+                        AsyncImage(url: URL(string: image.originalImageURL)) { loadedImage in
+                            loadedImage
+                                .resizable()
+                                .scaledToFit()
+                        } placeholder: {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                        .containerRelativeFrame(.horizontal)
+                        .id(image.id)
                     }
-                    .containerRelativeFrame(.horizontal)
-                    .id(image.id)
+                }
+                .scrollTargetLayout()
+            }
+            .scrollIndicators(.hidden)
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $selectedImageID)
+            .onMoveCommand { direction in
+                move(direction: direction)
+            }
+            .background {
+                // invisible keyboard capture layer
+                HStack {
+                    Button("Previous") { nudge(-1) }
+                        .keyboardShortcut(.leftArrow, modifiers: [])
+                    
+                    Button("Next") { nudge(1) }
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+                    
+                    Button("Favourite") {
+                        print("Adding to favourites")
+                    }
+                    .keyboardShortcut(.space, modifiers: [])
+                    
+                    Button("Start slideshow") {
+                        print("Starting slideshow...")
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+                }
+                .opacity(0)
+                .frame(width: 0, height: 0)
+            }
+            .onAppear {
+                if let id = selectedImageID {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
                 }
             }
-            .scrollTargetLayout()
-        }
-        .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $selectedImageID)
-        .onMoveCommand { direction in
-            move(direction: direction)
-        }
-        .background {
-            // invisible keyboard capture layer
-            HStack {
-                Button("Previous") { nudge(-1) }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-                
-                Button("Next") { nudge(1) }
-                    .keyboardShortcut(.rightArrow, modifiers: [])
-                
-                Button("Favourite") {
-                    print("Adding to favourites")
+            .background(.black)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        print("Adding to favourites...")
+                    } label: {
+                        Label("Favourite", systemImage: "heart")
+                    }
+                    
                 }
-                .keyboardShortcut(.space, modifiers: [])
-                
-                Button("Start slideshow") {
-                    print("Starting slideshow...")
-                }
-                .keyboardShortcut(.return, modifiers: [])
-            }
-            .opacity(0)
-            .frame(width: 0, height: 0)
-        }
-        .background(.black)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    print("Adding to favourites...")
-                } label: {
-                    Label("Favourite", systemImage: "heart")
-                }
-
             }
         }
     }
@@ -130,7 +139,7 @@ struct GalleryView: View {
         guard
             let currentID = selectedImageID,
             let index = viewModel.images.firstIndex(where: { $0.id == currentID })
-        else { return }
+                else { return }
         
         let newIndex = index + delta
         guard viewModel.images.indices.contains(newIndex) else { return }
