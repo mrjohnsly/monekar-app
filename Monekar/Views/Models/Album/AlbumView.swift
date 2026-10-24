@@ -99,11 +99,31 @@ struct GalleryView: View {
                 
                 Button("Next") { nudge(1) }
                     .keyboardShortcut(.rightArrow, modifiers: [])
+                
+                Button("Favourite") {
+                    print("Adding to favourites")
+                }
+                .keyboardShortcut(.space, modifiers: [])
+                
+                Button("Start slideshow") {
+                    print("Starting slideshow...")
+                }
+                .keyboardShortcut(.return, modifiers: [])
             }
             .opacity(0)
             .frame(width: 0, height: 0)
         }
         .background(.black)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    print("Adding to favourites...")
+                } label: {
+                    Label("Favourite", systemImage: "heart")
+                }
+
+            }
+        }
     }
     
     private func nudge(_ delta: Int) {
